@@ -463,7 +463,7 @@ function PainelLinha({ venda, hoje, aoFechar }: { venda: Venda; hoje: string; ao
                 )}
               >
                 {atual && <Check size={15} />}
-                <span className="truncate">{APARENCIA[st].rotulo}</span>
+                <span className="leading-normal">{APARENCIA[st].rotulo}</span>
               </Botao>
             );
           })}

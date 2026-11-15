@@ -650,7 +650,7 @@ function EditorVenda({
               type="button"
               onClick={() => setStatus(st)}
               className={cn(
-                "relative flex min-h-11 min-w-0 items-center justify-center overflow-hidden rounded-2xl px-1.5 text-[12px] font-semibold sm:text-[13px]",
+                "relative flex min-h-11 min-w-0 items-center justify-center rounded-2xl px-1.5 py-1.5 text-[12px] font-semibold leading-normal sm:text-[13px]",
                 !sel && "border border-line bg-white text-tinta-2",
                 sel && "text-crema",
               )}
@@ -658,9 +658,9 @@ function EditorVenda({
               {sel && (
                 <motion.span layoutId="status-edicao" transition={MOLINHO} className="absolute inset-0 rounded-2xl bg-brand" />
               )}
-              <span className="relative z-10 flex min-w-0 items-center gap-1">
+              <span className="relative z-10 flex min-w-0 items-center gap-1 leading-normal">
                 <span className={cn("size-2 shrink-0 rounded-full", APARENCIA[st].ponto)} />
-                <span className="truncate">{APARENCIA[st].curto}</span>
+                <span className="whitespace-nowrap leading-normal">{APARENCIA[st].curto}</span>
               </span>
             </button>
           );

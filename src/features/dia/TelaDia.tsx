@@ -469,11 +469,11 @@ export function TelaDia() {
         <div className="grid grid-cols-2 gap-2">
           <Botao variante="primario" tamanho="md" className="min-h-11 px-2.5 text-[13px] sm:text-[13.5px]" onClick={() => setColagemAberta(true)}>
             <ClipboardPaste size={15} />
-            <span className="truncate">Colar grupo</span>
+            <span className="leading-normal">Colar grupo</span>
           </Botao>
           <Botao variante="neutro" tamanho="md" className="min-h-11 px-2.5 text-[13px] sm:text-[13.5px]" onClick={() => setAvulsoAberto(true)}>
             <UserPlus size={15} />
-            <span className="truncate">Pedido avulso</span>
+            <span className="leading-normal">Pedido avulso</span>
           </Botao>
         </div>
 
@@ -1060,7 +1060,7 @@ function BotaoStatus({
       onClick={onClick}
       aria-pressed={ativo}
       className={cn(
-        "flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden rounded-xl border-2 px-1.5 py-1.5 text-[11px] font-bold tracking-tight transition-colors min-[380px]:text-[12px] sm:text-[12.5px]",
+        "flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl border-2 px-1.5 py-1.5 text-[11.5px] font-bold leading-normal tracking-tight transition-colors min-[380px]:text-[12px] sm:text-[12.5px]",
         ativo ? cor.solido : cor.inativo,
       )}
     >
@@ -1069,7 +1069,7 @@ function BotaoStatus({
       ) : (
         <span className="size-1.5 shrink-0 rounded-full bg-current opacity-45" />
       )}
-      <span className="truncate leading-none">{rotulo}</span>
+      <span className="whitespace-nowrap leading-normal">{rotulo}</span>
     </motion.button>
   );
 }
@@ -1662,7 +1662,7 @@ function PainelDivisao({
               type="button"
               onClick={() => setStatus(s)}
               className={cn(
-                "min-h-11 min-w-0 truncate rounded-xl border-2 px-1.5 text-[11.5px] font-bold transition-colors sm:text-[12.5px]",
+                "min-h-11 min-w-0 rounded-xl border-2 px-1.5 py-1.5 text-[11.5px] font-bold leading-normal transition-colors sm:text-[12.5px]",
                 status === s ? cor.ativo : cor.inativo,
               )}
             >
@@ -1803,7 +1803,7 @@ function DetalhePedido({
               type="button"
               onClick={() => aoStatus(s)}
               className={cn(
-                "min-h-11 min-w-0 truncate rounded-xl border-2 px-1.5 text-[11.5px] font-bold capitalize transition-colors sm:text-[12.5px]",
+                "min-h-11 min-w-0 rounded-xl border-2 px-1.5 py-1.5 text-[11.5px] font-bold capitalize leading-normal transition-colors sm:text-[12.5px]",
                 venda.status === s ? cor.ativo : cor.inativo,
               )}
             >

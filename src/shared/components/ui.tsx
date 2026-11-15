@@ -49,7 +49,7 @@ export function Botao({
   ...props
 }: BotaoProps) {
   const classes = cn(
-    "inline-flex min-w-0 max-w-full select-none items-center justify-center overflow-hidden text-center font-semibold leading-tight tracking-tight transition-colors [&_svg]:shrink-0",
+    "inline-flex min-w-0 max-w-full select-none items-center justify-center text-center font-semibold leading-normal tracking-tight transition-colors [&_svg]:shrink-0",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
     "disabled:pointer-events-none disabled:opacity-45",
     TAMANHOS[tamanho],
@@ -154,7 +154,7 @@ export function Chip({ children, className }: { children: ReactNode; className?:
       animate={{ opacity: 1, scale: 1 }}
       transition={MOLINHO}
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-xs font-semibold [&_svg]:shrink-0",
+        "inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-normal [&_svg]:shrink-0",
         className,
       )}
     >

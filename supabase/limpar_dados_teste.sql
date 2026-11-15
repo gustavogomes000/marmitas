@@ -28,3 +28,4 @@ commit;
 
 -- Atualiza o cache da API do Supabase
 notify pgrst, 'reload schema';
+
