@@ -21,9 +21,9 @@ export function valorRecebido(venda: Venda, preco: number): number {
   return venda.valorPago ?? valorLinha(venda, preco);
 }
 
-/** Deuda de quem é PG: o que falta depois de contar o que já foi pago. */
+/** O que falta receber desta linha (quem ainda não pagou ou pagou parcial). */
 export function faltaReceber(venda: Venda, preco: number): number {
-  if (!venda.pg || venda.status === "cancelada") return 0;
+  if (venda.status === "cancelada") return 0;
   return Math.max(0, valorLinha(venda, preco) - valorRecebido(venda, preco));
 }
 

@@ -3,10 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import {
-  Bike, Check, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardPaste,
-  Lock, Minus, Plus, Receipt, RotateCcw, Scissors, Sparkles, Trash2, UtensilsCrossed, Undo2, UserPlus, X,
+  Bike, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardPaste,
+  Minus, Plus, RotateCcw, Scissors, Sparkles, Trash2, UtensilsCrossed, Undo2, UserPlus, X,
 } from "lucide-react";
-import type { Categoria, DiaVenda, FormaPagamento, Venda } from "@/domain/types";
+import type { Categoria, DiaVenda, FormaPagamento, Venda, VendaEmAberto } from "@/domain/types";
 import { conferirMensagem, nomeParaExibir, parsearMensagem, type PropostaLinha } from "@/domain/parser";
 import {
   calcularTotais, dividirVenda, faltaReceber, idMovimentacaoPagamento, linhaExtra, precoUnitario,
@@ -23,8 +23,8 @@ import { MOLINHO, itemLista, listaStagger } from "@/shared/lib/motion";
 import { uid } from "@/shared/lib/storage";
 import { useReduzirMovimento, vibrar } from "@/shared/hooks/useAnimacao";
 import {
-  useAbrirDia, useCategorias, useDia, useDias, useEntregadores, useMovimentacaoRapida, useMovimentacoes,
-  useRemoverVenda, useSalvarDia, useSalvarVendas,
+  useCategorias, useDia, useDias, useEntregadores, useMovimentacaoRapida, useMovimentacoes,
+  useRemoverVenda, useSalvarDia, useSalvarVendas, useVendasEmAberto,
 } from "@/shared/hooks/useDados";
 import { cn } from "@/shared/lib/cn";
 
@@ -68,22 +68,21 @@ export function TelaDia() {
   const diasVizinhos = useDias(somarDias(data, -21), somarDias(data, 7));
   const salvarVendas = useSalvarVendas(data);
   const salvarDia = useSalvarDia(data);
-  const abrirDia = useAbrirDia(data);
   const removerVenda = useRemoverVenda(data);
   const caixa = useMovimentacaoRapida();
   const categorias = useCategorias();
   const entregadores = useEntregadores();
+  const vendasEmAbertoQuery = useVendasEmAberto(hoje);
 
   const [colagemAberta, setColagemAberta] = useState(false);
   const [avulsoAberto, setAvulsoAberto] = useState(false);
+  const [cobrancasAberta, setCobrancasAberta] = useState(false);
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<"todos" | "montar" | "entregar" | "receber">("todos");
-  const [receberAberto, setReceberAberto] = useState(true);
+  const [filtro, setFiltro] = useState<"todos" | "receber" | "montar" | "entregar">("todos");
   const [pagando, setPagando] = useState<Venda | null>(null);
   const [detalhe, setDetalhe] = useState<Venda | null>(null);
   const [dividindo, setDividindo] = useState<Venda | null>(null);
   const [escolhendoEntregador, setEscolhendoEntregador] = useState<Venda | null>(null);
-  const [fechando, setFechando] = useState(false);
   const [gastoAberto, setGastoAberto] = useState(false);
 
   const resumo = dia.data;
@@ -93,6 +92,7 @@ export function TelaDia() {
   const totais = resumo?.totais ?? calcularTotais([], 0);
   const categoriaVenda = (categorias.data ?? []).find((c) => c.fluxo === "entrada");
   const emAberto = useMemo(() => vendas.filter((v) => faltaReceber(v, preco) > 0), [vendas, preco]);
+  const todasEmAberto = vendasEmAbertoQuery.data ?? [];
 
   const movimentosDia = useMovimentacoes(data, data);
   const gastos = useMemo(
@@ -106,8 +106,6 @@ export function TelaDia() {
     [categorias.data],
   );
   const nomeCategoria = (id: string) => (categorias.data ?? []).find((c) => c.id === id)?.nome ?? "sem categoria";
-  const criado = (diasVizinhos.data ?? []).some((d) => d.data === data);
-  const fechado = Boolean(cabecalho.fechadoEm);
 
   const nomeDoEntregador = (id: string | null) =>
     id ? (entregadores.data ?? []).find((e) => e.id === id)?.nome ?? "removido" : null;
@@ -138,10 +136,7 @@ export function TelaDia() {
   }
 
   function alternarPaga(venda: Venda) {
-    if (venda.paga) {
-      desfazerPagamento(venda);
-      return;
-    }
+    vibrar(8);
     setPagando(venda);
   }
 
@@ -206,7 +201,9 @@ export function TelaDia() {
   function desfazerPagamento(venda: Venda) {
     aplicar([{ ...venda, paga: false, valorPago: null }]);
     caixa.apagar.mutate(idMovimentacaoPagamento(venda.id));
-    toast("Pagamento retirado do caixa");
+    setPagando(null);
+    vibrar([10, 30, 10]);
+    toast("Pagamento desmarcado e retirado do caixa");
   }
 
   function cancelar(venda: Venda, motivo: string) {
@@ -227,22 +224,6 @@ export function TelaDia() {
     aplicar([{ ...venda, entreguePor: entregadorId }]);
     setEscolhendoEntregador(null);
     setDetalhe((d) => (d?.id === venda.id ? { ...d, entreguePor: entregadorId } : d));
-  }
-
-  function fecharDia() {
-    salvarDia.mutate({ ...cabecalho, fechadoEm: hoje });
-    setFechando(false);
-    vibrar([8, 30, 8]);
-    toast.success(`Dia ${dataCurta(data)} fechado`, {
-      description: emAberto.length
-        ? `${emAberto.length} marmita(s) em aberto para cobrar no painel.`
-        : "Tudo recebido por aqui.",
-    });
-  }
-
-  function reabrirDia() {
-    salvarDia.mutate({ ...cabecalho, fechadoEm: null });
-    toast("Dia aberto de novo");
   }
 
   const semana = useMemo(() => semanaDe(data), [data]);
@@ -271,7 +252,7 @@ export function TelaDia() {
 
   return (
     <div className="flex flex-col gap-3">
-      <BarraProgresso ativo={salvarVendas.isPending || salvarDia.isPending || abrirDia.isPending} />
+      <BarraProgresso ativo={salvarVendas.isPending || salvarDia.isPending} />
       <Cartao className="overflow-hidden p-0">
         <div className="flex items-stretch gap-1 border-b border-brand-ink/20 bg-brand px-1.5 py-2 text-crema">
           <button
@@ -349,7 +330,6 @@ export function TelaDia() {
             )}
             <p className="num truncate text-[11px] text-tinta-3">
               {preco > 0 ? `${moeda(preco)} a marmita` : "defina o preço da marmita"}
-              {criado ? "" : " · dia ainda não criado"}
             </p>
           </div>
           {data !== hoje && (
@@ -359,12 +339,6 @@ export function TelaDia() {
             >
               ir para hoje
             </button>
-          )}
-          {fechado && (
-            <Chip className="shrink-0 border-line bg-neutro/70 text-neutro-ink">
-              <Lock size={11} />
-              fechado
-            </Chip>
           )}
         </div>
 
@@ -427,141 +401,53 @@ export function TelaDia() {
         </div>
       </Cartao>
 
-      {!criado && !dia.isPending && (
-        <Cartao className="flex flex-col items-start gap-2.5 border-gold-300 bg-gold-soft p-3.5">
-          <p className="text-[13px] font-semibold leading-snug text-preparada-ink">
-            {rotuloRelativo(data)} ainda não tem dia na agenda. Criar para começar a lançar.
-          </p>
-          <Botao
-            variante="dourado"
-            tamanho="sm"
-            disabled={abrirDia.isPending}
-            onClick={() =>
-              abrirDia.mutate(undefined, {
-                onSuccess: () => toast.success(`Dia ${dataCurta(data)} criado`),
-              })
-            }
-          >
-            <Plus size={16} />
-            Criar este dia
-          </Botao>
-        </Cartao>
-      )}
-
-      {emAberto.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={MOLINHO}
-          className={cn(
-            "card border-paga/40 bg-paga-soft p-0",
-            filtro === "receber" && "ring-2 ring-paga/50",
-          )}
-        >
-          <button
-            onClick={() => setReceberAberto((o) => !o)}
-            aria-expanded={receberAberto}
-            className="flex w-full items-center gap-3 p-3 text-left"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-paga text-white">
-              <CircleDollarSign size={19} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-bold text-paga-ink">
-                {emAberto.length} em aberto · {moeda(totais.aReceber)}
-              </span>
-              <span className="block truncate text-[11.5px] text-paga-ink/80">
-                {receberAberto ? "Dando baixa um por um" : "Toque para ver quem ficou de pagar"}
-              </span>
-            </span>
-            <ChevronDown
-              size={16}
-              className={cn("shrink-0 text-paga-ink transition-transform", receberAberto && "rotate-180")}
-            />
-          </button>
-
-          <AnimatePresence initial={false}>
-            {receberAberto && (
-              <motion.ul
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={MOLINHO}
-                className="overflow-hidden"
-              >
-                {emAberto.map((venda) => (
-                  <LinhaReceber
-                    key={venda.id}
-                    venda={venda}
-                    falta={faltaReceber(venda, preco)}
-                    aoReceber={() => setPagando(venda)}
-                  />
-                ))}
-                <li className="px-3 pb-3 pt-1">
-                  <Botao
-                    variante="fantasma"
-                    tamanho="sm"
-                    className="text-[12px] text-paga-ink"
-                    onClick={() => setFiltro(filtro === "receber" ? "todos" : "receber")}
-                  >
-                    {filtro === "receber" ? "Mostrar todos os pedidos" : "Isolar só esses na lista"}
-                  </Botao>
-                </li>
-              </motion.ul>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      )}
-
       <Cartao className="flex flex-col gap-3 p-3.5">
-        <div className="flex flex-col gap-2">
-          <Campo
-            key={`${data}-${preco}`}
-            rotulo={`Preço da marmita · ${rotuloRelativo(data)}`}
-            inputMode="decimal"
-            prefixo="R$"
-            dica="0,00"
-            defaultValue={preco ? String(preco).replace(".", ",") : ""}
-            onBlur={(e) => {
-              const novo = paraNumero(e.currentTarget.value);
-              if (novo !== preco) {
-                salvarDia.mutate({ ...cabecalho, precoMarmita: novo });
-                toast.success(novo ? `Preço do dia: ${moeda(novo)}` : "Preço retirado");
-              }
-            }}
-            className="flex-1"
-          />
-          {preco === 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-tinta-3">Atalhos:</span>
-              {[15, 18, 20, 22, 25].map((sugestao) => (
-                <button
-                  key={sugestao}
-                  type="button"
-                  onClick={() => {
-                    vibrar(8);
-                    salvarDia.mutate({ ...cabecalho, precoMarmita: sugestao });
-                    toast.success(`Preço do dia: ${moeda(sugestao)}`);
-                  }}
-                  className="num rounded-full border border-line bg-crema-2/80 px-2.5 py-1 text-[11.5px] font-bold text-brand transition-transform active:scale-95 active:bg-brand-soft"
-                >
-                  R$ {sugestao}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <Campo
+          key={`${data}-${preco}`}
+          rotulo={`Preço da marmita · ${rotuloRelativo(data)}`}
+          inputMode="decimal"
+          prefixo="R$"
+          dica="0,00"
+          defaultValue={preco ? String(preco).replace(".", ",") : ""}
+          onBlur={(e) => {
+            const novo = paraNumero(e.currentTarget.value);
+            if (novo !== preco) {
+              salvarDia.mutate({ ...cabecalho, precoMarmita: novo });
+              toast.success(novo ? `Preço do dia: ${moeda(novo)}` : "Preço retirado");
+            }
+          }}
+          className="flex-1"
+        />
 
         <div className="grid grid-cols-2 gap-2.5">
-          <Botao variante="primario" tamanho="md" className="h-11" onClick={() => setColagemAberta(true)}>
-            <ClipboardPaste size={17} />
+          <Botao variante="primario" tamanho="md" className="h-11 whitespace-nowrap px-3 text-[13.5px]" onClick={() => setColagemAberta(true)}>
+            <ClipboardPaste size={16} />
             Colar grupo
           </Botao>
-          <Botao variante="neutro" tamanho="md" className="h-11" onClick={() => setAvulsoAberto(true)}>
-            <UserPlus size={17} />
+          <Botao variante="neutro" tamanho="md" className="h-11 whitespace-nowrap px-3 text-[13.5px]" onClick={() => setAvulsoAberto(true)}>
+            <UserPlus size={16} />
             Pedido avulso
           </Botao>
         </div>
+
+        <Botao
+          variante="dourado"
+          tamanho="sm"
+          larguraTotal
+          className="h-10 text-[13px]"
+          onClick={() => {
+            vibrar(8);
+            setCobrancasAberta(true);
+          }}
+        >
+          <CircleDollarSign size={16} />
+          Filtrar não pagos por dia (Cobranças)
+          {todasEmAberto.length > 0 && (
+            <span className="num ml-1 rounded-full bg-brand px-2 py-0.5 text-[11px] font-extrabold text-crema">
+              {todasEmAberto.length}
+            </span>
+          )}
+        </Botao>
       </Cartao>
 
       <Cartao className="flex flex-col gap-2 p-3">
@@ -611,22 +497,6 @@ export function TelaDia() {
         </div>
       </Cartao>
 
-      {criado && (
-        <div className="flex gap-2">
-          {fechado ? (
-            <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={reabrirDia}>
-              <RotateCcw size={16} />
-              Reabrir o dia
-            </Botao>
-          ) : (
-            <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={() => setFechando(true)}>
-              <Lock size={16} />
-              Fechar o dia
-            </Botao>
-          )}
-        </div>
-      )}
-
       {vendas.length > 0 && (
         <div className="flex flex-col gap-2">
           <Campo
@@ -648,7 +518,7 @@ export function TelaDia() {
             }
           />
           <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {(["todos", "montar", "entregar", "receber"] as const).map((f) => {
+            {(["todos", "receber", "montar", "entregar"] as const).map((f) => {
               const ativo = filtro === f;
               return (
                 <motion.button
@@ -674,9 +544,9 @@ export function TelaDia() {
                   )}
                   <span className="relative z-10">
                     {f === "todos" && `Todos (${vendas.length})`}
+                    {f === "receber" && `Não pagaram (${emAberto.length})`}
                     {f === "montar" && `Faltam montar (${totais.pendentes})`}
                     {f === "entregar" && "Prontas p/ entregar"}
-                    {f === "receber" && `A receber (${moeda(totais.aReceber)})`}
                   </span>
                 </motion.button>
               );
@@ -711,15 +581,9 @@ export function TelaDia() {
           titulo={`${rotuloRelativo(data)} sem pedidos`}
           descricao="Cole a mensagem do grupo: eu leio nome por nome, somo as quantidades e comparo com o que já existe."
           acao={
-            <div className="flex gap-2">
-              <Botao variante="dourado" onClick={() => setColagemAberta(true)}>Colar mensagem</Botao>
-              {!criado && (
-                <Botao variante="neutro" onClick={() => abrirDia.mutate(undefined, { onSuccess: () => toast.success(`Dia ${dataCurta(data)} criado`) })}>
-                  <Plus size={16} />
-                  Criar dia
-                </Botao>
-              )}
-            </div>
+            <Botao variante="dourado" onClick={() => setColagemAberta(true)}>
+              Colar mensagem
+            </Botao>
           }
         />
       ) : (
@@ -745,13 +609,19 @@ export function TelaDia() {
         </motion.ul>
       )}
 
-      <Sheet aberto={Boolean(pagando)} aoFechar={() => setPagando(null)} titulo="Recebimento">
+      <Sheet
+        aberto={Boolean(pagando)}
+        aoFechar={() => setPagando(null)}
+        titulo={pagando?.paga ? "Pagamento registrado" : "Confirmar pagamento"}
+      >
         {pagando && (
           <FormPagamento
+            key={`${pagando.id}-${pagando.paga}-${pagando.valorPago ?? ""}`}
             venda={pagando}
             sugestao={valorLinha(pagando, preco)}
             dia={data}
             aoConfirmar={(valor, forma, obs) => registrarPagamento(pagando, valor, forma, obs)}
+            aoDesmarcar={() => desfazerPagamento(pagando)}
           />
         )}
       </Sheet>
@@ -786,47 +656,25 @@ export function TelaDia() {
         />
       </Sheet>
 
-      <Sheet aberto={fechando} aoFechar={() => setFechando(false)} titulo="Fechar o dia">
-        <div className="flex flex-col gap-3 pb-2">
-          <p className="text-[13px] font-semibold text-tinta">
-            {rotuloRelativo(data)}, {dataCurta(data)}
-            {cabecalho.obs ? ` · ${cabecalho.obs}` : ""}
-          </p>
-
-          <div className="grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-white">
-            <Metrica rotulo="Marmitas" valor={totais.marmitas} cor="text-brand" />
-            <Metrica rotulo="No caixa" valor={totais.recebido} cor="text-paga-ink" formato={moeda} />
-            <Metrica rotulo="A cobrar" valor={totais.aReceber} cor="text-preparada-ink" formato={moeda} />
-          </div>
-
-          {emAberto.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <p className="rounded-xl bg-gold-soft px-3 py-2.5 text-[12.5px] font-semibold leading-snug text-preparada-ink">
-                {emAberto.length} marmita(s) ficaram em aberto. Ao fechar o dia elas vão para a lista de
-                cobranças do painel, para você marcar o pagamento nos próximos dias.
-              </p>
-              <ul className="flex flex-wrap gap-1.5">
-                {emAberto.slice(0, 10).map((v) => (
-                  <li key={v.id} className="num rounded-full border border-gold-300 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-preparada-ink">
-                    {nomeParaExibir(v.cliente)} · {v.qtd}
-                  </li>
-                ))}
-                {emAberto.length > 10 && (
-                  <li className="num self-center text-[11.5px] text-tinta-3">+{emAberto.length - 10}</li>
-                )}
-              </ul>
-            </div>
-          ) : (
-            <p className="rounded-xl bg-entregue/12 px-3 py-2.5 text-[12.5px] font-semibold text-entregue-ink">
-              Nada em aberto — tudo recebido.
-            </p>
-          )}
-
-          <Botao variante="primario" tamanho="lg" larguraTotal onClick={fecharDia}>
-            <Lock size={17} />
-            Fechar {dataCurta(data)}
-          </Botao>
-        </div>
+      <Sheet
+        aberto={cobrancasAberta}
+        aoFechar={() => setCobrancasAberta(false)}
+        titulo="Não pagaram por dia (Cobranças)"
+      >
+        <PainelCobrancasPorDia
+          itens={todasEmAberto}
+          diaAtual={data}
+          aoIrParaDia={(iso) => {
+            setCobrancasAberta(false);
+            mudarData(iso);
+            setFiltro("receber");
+          }}
+          aoReceberItem={(item) => {
+            setCobrancasAberta(false);
+            if (item.dia.data !== data) mudarData(item.dia.data);
+            setPagando(item.venda);
+          }}
+        />
       </Sheet>
 
       <Sheet aberto={Boolean(escolhendoEntregador)} aoFechar={() => setEscolhendoEntregador(null)} titulo="Quem entregou?">
@@ -958,40 +806,160 @@ function Metrica({ rotulo, valor, cor, formato }: { rotulo: string; valor: numbe
   );
 }
 
-/** Uma linha da lista "em aberto": quem deve, quanto deve e o botão de dar baixa. */
-function LinhaReceber({
-  venda,
-  falta,
-  aoReceber,
+function PainelCobrancasPorDia({
+  itens,
+  diaAtual,
+  aoIrParaDia,
+  aoReceberItem,
 }: {
-  venda: Venda;
-  falta: number;
-  aoReceber: () => void;
+  itens: VendaEmAberto[];
+  diaAtual: string;
+  aoIrParaDia: (data: string) => void;
+  aoReceberItem: (item: VendaEmAberto) => void;
 }) {
+  const [diaFiltro, setDiaFiltro] = useState<string>("todos");
+  const [buscaCliente, setBuscaCliente] = useState("");
+
+  const diasComPendencia = useMemo(() => {
+    const mapa = new Map<string, { data: string; qtd: number; soma: number }>();
+    for (const item of itens) {
+      const atual = mapa.get(item.dia.data) ?? { data: item.dia.data, qtd: 0, soma: 0 };
+      atual.qtd += 1;
+      atual.soma += item.valor;
+      mapa.set(item.dia.data, atual);
+    }
+    return [...mapa.values()].sort((a, b) => (a.data < b.data ? 1 : -1));
+  }, [itens]);
+
+  const filtrados = useMemo(() => {
+    const termo = normalizar(buscaCliente);
+    return itens.filter((item) => {
+      if (diaFiltro !== "todos" && item.dia.data !== diaFiltro) return false;
+      if (termo && !normalizar(item.venda.cliente).includes(termo)) return false;
+      return true;
+    });
+  }, [itens, diaFiltro, buscaCliente]);
+
+  const totalFiltrado = filtrados.reduce((s, i) => s + i.valor, 0);
+
   return (
-    <motion.li
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 8 }}
-      transition={MOLINHO}
-      className="flex items-center gap-2 border-t border-paga/20 px-3 py-2"
-    >
-      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-paga-ink">
-        {nomeParaExibir(venda.cliente)}
-        <span className="num ml-1.5 text-[11px] font-bold text-tinta-3">×{venda.qtd}</span>
-        {venda.paga && <span className="ml-1.5 text-[10px] font-semibold text-preparada-ink">parcial</span>}
-      </span>
-      <span className="num shrink-0 text-[12.5px] font-bold text-preparada-ink">{moeda(falta)}</span>
-      <Botao
-        variante="dourado"
-        tamanho="sm"
-        className="h-8 shrink-0 gap-1 rounded-full px-3 text-[12px]"
-        onClick={aoReceber}
-      >
-        <Receipt size={13} />
-        Receber
-      </Botao>
-    </motion.li>
+    <div className="flex flex-col gap-3.5 pb-2">
+      <div className="flex items-center justify-between rounded-2xl border border-gold-300 bg-gold-soft/75 px-3.5 py-2.5">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-preparada-ink">Total a receber</p>
+          <p className="text-[12px] text-tinta-2">{filtrados.length} pedido(s) pendente(s) de pagamento</p>
+        </div>
+        <span className="num font-display text-[20px] font-bold text-preparada-ink">{moeda(totalFiltrado)}</span>
+      </div>
+
+      {diasComPendencia.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="pl-1 text-[11.5px] font-bold uppercase tracking-wider text-tinta-3">
+            Filtrar por dia do pedido
+          </span>
+          <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                vibrar(6);
+                setDiaFiltro("todos");
+              }}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                diaFiltro === "todos"
+                  ? "border-brand bg-brand text-crema"
+                  : "border-line bg-white text-tinta-2",
+              )}
+            >
+              Todos os dias ({itens.length})
+            </button>
+            {diasComPendencia.map((d) => {
+              const ativo = diaFiltro === d.data;
+              return (
+                <button
+                  key={d.data}
+                  type="button"
+                  onClick={() => {
+                    vibrar(6);
+                    setDiaFiltro(d.data);
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                    ativo ? "border-brand bg-brand text-crema" : "border-line bg-white text-tinta-2",
+                  )}
+                >
+                  {rotuloRelativo(d.data)} · {dataCurta(d.data)} ({d.qtd})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <Campo
+        rotulo="Buscar pessoa"
+        dica="Digite o nome de quem ficou de pagar..."
+        value={buscaCliente}
+        onChange={(e) => setBuscaCliente(e.target.value)}
+      />
+
+      {filtrados.length === 0 ? (
+        <div className="rounded-2xl border border-paga/30 bg-paga-soft/60 p-4 text-center">
+          <p className="text-[13.5px] font-bold text-paga-ink">Ninguém devendo neste filtro!</p>
+          <p className="mt-0.5 text-[12px] text-tinta-2">Todos os pedidos selecionados já foram pagos.</p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {filtrados.map((item) => (
+            <li
+              key={item.venda.id}
+              className="card flex items-center justify-between gap-2.5 p-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[15px] font-bold text-tinta">
+                    {nomeParaExibir(item.venda.cliente)}
+                  </span>
+                  <span className="num rounded-full bg-crema-2 px-2 py-0.5 text-[11px] font-bold text-brand">
+                    ×{item.venda.qtd}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11.5px] text-tinta-3">
+                  <button
+                    type="button"
+                    onClick={() => aoIrParaDia(item.dia.data)}
+                    className="inline-flex items-center gap-1 font-semibold text-brand underline decoration-brand/35"
+                  >
+                    <CalendarDays size={12} />
+                    {rotuloRelativo(item.dia.data)} ({dataCurta(item.dia.data)})
+                  </button>
+                  {item.dia.data !== diaAtual && (
+                    <span className="rounded-full bg-gold-soft px-2 py-0.2 text-[10.5px] font-bold text-preparada-ink">
+                      outro dia
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="num text-[14px] font-extrabold text-cancelada-ink">
+                  {moeda(item.valor)}
+                </span>
+                <Botao
+                  variante="sucesso"
+                  tamanho="sm"
+                  className="h-9 rounded-full px-3 text-[12px]"
+                  onClick={() => aoReceberItem(item)}
+                >
+                  <Check size={14} />
+                  Pagar
+                </Botao>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -1067,15 +1035,20 @@ function LinhaPedido({
   const cor = APARENCIA[venda.status];
   const reduzido = useReduzirMovimento();
   const anterior = useRef(venda.status);
+  const anteriorPaga = useRef(venda.paga);
   const [pulso, setPulso] = useState(0);
   const falta = faltaReceber(venda, preco);
+  const quitada = venda.paga && falta <= 0 && venda.status !== "cancelada";
+  const aparenciaCard = quitada ? PAGA.card : cor.card;
+  const corFlash = quitada ? PAGA.cheio : cor.cheio;
 
   useEffect(() => {
-    if (venda.status !== anterior.current) {
+    if (venda.status !== anterior.current || venda.paga !== anteriorPaga.current) {
       anterior.current = venda.status;
+      anteriorPaga.current = venda.paga;
       setPulso((p) => p + 1);
     }
-  }, [venda.status]);
+  }, [venda.status, venda.paga]);
 
   return (
     <motion.li
@@ -1083,12 +1056,16 @@ function LinhaPedido({
       exit="saindo"
       layout
       transition={MOLINHO}
-      className={cn("card relative overflow-hidden py-2.5 pl-4 pr-2.5 transition-colors duration-300", cor.card)}
+      className={cn(
+        "card relative overflow-hidden py-2.5 pl-4 pr-2.5 transition-colors duration-300",
+        aparenciaCard,
+        quitada && "shadow-[0_10px_26px_-14px_rgba(21,128,61,0.35)]",
+      )}
     >
       <motion.span
         layout
         transition={MOLINHO}
-        className={cn("absolute inset-y-0 left-0 w-1.5", venda.paga && falta <= 0 ? PAGA.barra : cor.barra)}
+        className={cn("absolute inset-y-0 left-0 w-2", quitada ? PAGA.barra : cor.barra)}
       />
 
       {/* flash de confirmação: o card inteiro pisca na cor do status novo */}
@@ -1100,7 +1077,7 @@ function LinhaPedido({
             animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.55, ease: "easeOut" }}
-            className={cn("pointer-events-none absolute inset-0", cor.cheio)}
+            className={cn("pointer-events-none absolute inset-0", corFlash)}
             aria-hidden
           />
         )}
@@ -1181,82 +1158,213 @@ function FormPagamento({
   sugestao,
   dia,
   aoConfirmar,
+  aoDesmarcar,
 }: {
   venda: Venda;
   sugestao: number;
   dia: string;
   aoConfirmar: (valor: number, forma: FormaPagamento, obs: string) => void;
+  aoDesmarcar: () => void;
 }) {
-  const [valor, setValor] = useState(sugestao ? sugestao.toFixed(2).replace(".", ",") : "");
+  const valorInicial = venda.paga && venda.valorPago != null ? venda.valorPago : sugestao;
+  const [valor, setValor] = useState(valorInicial ? valorInicial.toFixed(2).replace(".", ",") : "");
   const [forma, setForma] = useState<FormaPagamento>("pix");
   const [obs, setObs] = useState("");
+  const [editandoPago, setEditandoPago] = useState(!venda.paga);
+  const [confirmandoDesmarcar, setConfirmandoDesmarcar] = useState(false);
   const numerico = paraNumero(valor);
 
   return (
-    <div className="flex flex-col gap-3 pb-2">
-      <p className="text-[13px] text-tinta-2">
-        <span className="font-bold text-brand">{nomeParaExibir(venda.cliente)}</span> · {venda.qtd} marmita
-        {venda.qtd > 1 ? "s" : ""}. O valor entra no caixa de {rotuloRelativo(dia)} —
-        ajuste se foi mais caro (frete, extra, desconto).
-      </p>
-
-      <div className="card flex items-center justify-between gap-3 p-4">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-tinta-3">entra no caixa</span>
-        <input
-          inputMode="decimal"
-          value={valor}
-          onChange={(e) => setValor(e.target.value.replace(/[^\d,.]/g, ""))}
-          className="num w-32 bg-transparent text-right text-[26px] font-bold text-paga-ink focus:outline-none"
-        />
-      </div>
-
-      {sugestao > 0 && (
-        <div className="flex gap-2">
-          <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={() => setValor(sugestao.toFixed(2).replace(".", ","))}>
-            {moeda(sugestao)} exato
-          </Botao>
-          <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={() => setValor((sugestao + 5).toFixed(2).replace(".", ","))}>
-            + frete {moeda(5)}
-          </Botao>
-          <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={() => setValor((sugestao / 2).toFixed(2).replace(".", ","))}>
-            metade
-          </Botao>
-        </div>
-      )}
-
-      {venda.pg && numerico > 0 && numerico < sugestao && (
-        <p className="rounded-xl bg-gold-soft px-3 py-2 text-[12.5px] font-semibold text-preparada-ink">
-          pagamento parcial: continua PG devendo {moeda(sugestao - numerico)} — aparece em "em aberto" no dia e no painel.
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {FORMAS.map((f) => (
-          <button
-            key={f.valor}
-            onClick={() => setForma(f.valor)}
-            className={cn(
-              "rounded-full border-2 px-3.5 py-1.5 text-[12px] font-semibold transition-colors",
-              forma === f.valor ? "border-paga bg-paga-soft text-paga-ink" : "border-line bg-white text-tinta-3",
-            )}
-          >
-            {f.rotulo}
-          </button>
-        ))}
-      </div>
-
-      <Campo rotulo="Anotação do recebimento (opcional)" dica="ex.: pagou com nota de R$ 100" value={obs} onChange={(e) => setObs(e.target.value)} />
-
-      <Botao
-        variante="primario"
-        tamanho="lg"
-        larguraTotal
-        disabled={numerico <= 0}
-        onClick={() => aoConfirmar(numerico, forma, obs.trim())}
+    <div className="flex flex-col gap-3.5 pb-2">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3 rounded-2xl border p-3.5",
+          venda.paga ? "border-paga/45 bg-paga-soft/80" : "border-line bg-white",
+        )}
       >
-        <Receipt size={17} />
-        {numerico > 0 ? `Entrar ${moeda(numerico)} no caixa` : "Digite o valor"}
-      </Botao>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate font-display text-[18px] font-semibold text-tinta">
+              {nomeParaExibir(venda.cliente)}
+            </p>
+            <span className="num rounded-full bg-brand-soft px-2 py-0.5 text-[11.5px] font-bold text-brand">
+              ×{venda.qtd}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[12px] text-tinta-2">
+            {venda.paga
+              ? `Já marcado como pago em ${rotuloRelativo(dia)}`
+              : `Recebimento de ${rotuloRelativo(dia)}`}
+          </p>
+        </div>
+        <div className="text-right">
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-tinta-3">Total</span>
+          <span className="num font-display text-[20px] font-bold text-paga-ink">
+            {moeda(valorInicial || sugestao)}
+          </span>
+        </div>
+      </div>
+
+      {venda.paga && !editandoPago ? (
+        <div className="flex flex-col gap-2.5">
+          <div className="rounded-2xl border border-paga/35 bg-white p-3.5">
+            <p className="flex items-center gap-2 text-[13.5px] font-bold text-paga-ink">
+              <Check size={16} className="shrink-0 text-paga" />
+              Este pedido já está pago no caixa ({moeda(valorInicial || sugestao)})
+            </p>
+            <p className="mt-1 text-[12.5px] leading-snug text-tinta-2">
+              Para evitar desmarcar por engano, escolha abaixo se deseja editar o pagamento ou desmarcar com confirmação:
+            </p>
+          </div>
+
+          <Botao
+            variante="neutro"
+            tamanho="md"
+            larguraTotal
+            onClick={() => {
+              vibrar(6);
+              setEditandoPago(true);
+              setConfirmandoDesmarcar(false);
+            }}
+          >
+            Editar valor ou forma de pagamento
+          </Botao>
+
+          {!confirmandoDesmarcar ? (
+            <Botao
+              variante="fantasma"
+              tamanho="md"
+              larguraTotal
+              className="border border-cancelada/30 text-cancelada-ink"
+              onClick={() => {
+                vibrar(8);
+                setConfirmandoDesmarcar(true);
+              }}
+            >
+              <Undo2 size={16} />
+              Desmarcar pagamento
+            </Botao>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col gap-2.5 rounded-2xl border-2 border-cancelada bg-cancelada/8 p-3.5"
+            >
+              <p className="text-[13px] font-bold leading-snug text-cancelada-ink">
+                Confirmar desmarcação? O valor de {moeda(valorInicial || sugestao)} de {nomeParaExibir(venda.cliente)} será retirado do caixa.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Botao
+                  variante="neutro"
+                  tamanho="md"
+                  onClick={() => setConfirmandoDesmarcar(false)}
+                >
+                  Manter pago
+                </Botao>
+                <Botao
+                  variante="perigo"
+                  tamanho="md"
+                  onClick={aoDesmarcar}
+                >
+                  Sim, desmarcar
+                </Botao>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="card flex items-center justify-between gap-3 border-paga/35 bg-white p-4">
+            <span className="text-[11.5px] font-bold uppercase tracking-wide text-tinta-2">Valor recebido (R$)</span>
+            <input
+              inputMode="decimal"
+              value={valor}
+              onChange={(e) => setValor(e.target.value.replace(/[^\d,.]/g, ""))}
+              placeholder="0,00"
+              className="num w-36 bg-transparent text-right text-[28px] font-bold text-paga-ink focus:outline-none"
+            />
+          </div>
+
+          {sugestao > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              <Botao variante="neutro" tamanho="sm" onClick={() => setValor(sugestao.toFixed(2).replace(".", ","))}>
+                {moeda(sugestao)} exato
+              </Botao>
+              <Botao variante="neutro" tamanho="sm" onClick={() => setValor((sugestao + 5).toFixed(2).replace(".", ","))}>
+                + frete {moeda(5)}
+              </Botao>
+              <Botao variante="neutro" tamanho="sm" onClick={() => setValor((sugestao / 2).toFixed(2).replace(".", ","))}>
+                Metade
+              </Botao>
+            </div>
+          )}
+
+          {numerico > 0 && numerico < sugestao && (
+            <p className="rounded-xl bg-gold-soft px-3 py-2 text-[12.5px] font-semibold text-preparada-ink">
+              Pagamento parcial: faltam {moeda(sugestao - numerico)} para quitar este pedido.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <span className="pl-1 text-[12.5px] font-semibold text-tinta-2">Forma de pagamento</span>
+            <div className="grid grid-cols-4 gap-2">
+              {FORMAS.map((f) => (
+                <button
+                  key={f.valor}
+                  type="button"
+                  onClick={() => {
+                    vibrar(6);
+                    setForma(f.valor);
+                  }}
+                  className={cn(
+                    "rounded-2xl border-2 py-2.5 text-center text-[13px] font-bold transition-all active:scale-96",
+                    forma === f.valor
+                      ? "border-paga bg-paga text-white shadow-suave"
+                      : "border-line bg-white text-tinta-2",
+                  )}
+                >
+                  {f.rotulo}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Campo
+            rotulo="Observação do pagamento (opcional)"
+            dica="ex.: pagou no Pix / troco para R$ 50"
+            value={obs}
+            onChange={(e) => setObs(e.target.value)}
+          />
+
+          <div className="flex flex-col gap-2 pt-1">
+            <Botao
+              variante="sucesso"
+              tamanho="lg"
+              larguraTotal
+              disabled={numerico <= 0}
+              onClick={() => aoConfirmar(numerico, forma, obs.trim())}
+            >
+              <Check size={18} />
+              {venda.paga
+                ? `Salvar alteração (${moeda(numerico)})`
+                : numerico > 0
+                  ? `Confirmar pagamento de ${moeda(numerico)}`
+                  : "Digite o valor recebido"}
+            </Botao>
+
+            {venda.paga && (
+              <Botao
+                variante="fantasma"
+                tamanho="sm"
+                larguraTotal
+                onClick={() => setEditandoPago(false)}
+              >
+                Voltar
+              </Botao>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

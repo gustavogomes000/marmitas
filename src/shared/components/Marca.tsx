@@ -34,9 +34,22 @@ export function LogoCompleta({ className, alt = "D'a Márcia Marmitaria" }: { cl
 export function Marca({ compacta = false }: { compacta?: boolean }) {
   if (compacta) {
     return (
-      <span className="flex shrink-0 items-center gap-2">
-        <Simbolo tamanho={32} />
-        <Lettering altura={22} />
+      <span className="flex shrink-0 items-center gap-2.5">
+        <img
+          src="/marca-192.png"
+          alt="Logo D'a Márcia"
+          width={42}
+          height={42}
+          className="size-[42px] shrink-0 rounded-xl border border-gold/45 object-cover shadow-suave"
+        />
+        <span className="flex flex-col leading-none">
+          <span className="font-display text-[19px] font-bold tracking-tight text-gold">
+            D&apos;a Márcia
+          </span>
+          <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-crema/85">
+            Marmitaria
+          </span>
+        </span>
       </span>
     );
   }

@@ -367,9 +367,9 @@ export function Sheet({
   return (
     <Dialog.Root open={aberto} onOpenChange={(a) => !a && aoFechar()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="camada fixed inset-0 z-50 bg-brand-ink/50 backdrop-blur-[3px]" />
-        <Dialog.Content className="folha fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[90dvh] w-full max-w-[580px] flex-col rounded-t-[28px] border-t border-gold/25 bg-crema shadow-elevado outline-none">
-          <header className="relative flex items-center justify-between border-b border-line/60 px-5 pb-3 pt-5">
+        <Dialog.Overlay className="camada fixed inset-0 z-50 bg-brand-ink/55 backdrop-blur-[3px]" />
+        <Dialog.Content className="folha fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[calc(100dvh-var(--safe-top)-3.5rem)] w-full max-w-[580px] flex-col rounded-t-[28px] border-t border-gold/25 bg-crema shadow-elevado outline-none">
+          <header className="relative flex shrink-0 items-center justify-between border-b border-line/60 px-5 pb-3 pt-5">
             <span className="absolute left-1/2 top-2 h-1.5 w-11 -translate-x-1/2 rounded-full bg-line" />
             <Dialog.Title className="font-display text-[19px] font-semibold text-brand">{titulo}</Dialog.Title>
             <Dialog.Close asChild>
@@ -378,9 +378,9 @@ export function Sheet({
               </Botao>
             </Dialog.Close>
           </header>
-          <div className="overflow-y-auto overscroll-contain px-5 pb-4 pt-3">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-3">{children}</div>
           {rodape && (
-            <footer className="border-t border-line bg-crema/95 px-5 py-3 pb-[calc(0.75rem+var(--safe-bottom))] backdrop-blur-sm">
+            <footer className="shrink-0 border-t border-line bg-crema/95 px-5 py-3 pb-[calc(0.75rem+var(--safe-bottom))] backdrop-blur-sm">
               {rodape}
             </footer>
           )}

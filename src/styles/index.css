@@ -33,11 +33,12 @@
   --color-neutro-ink: #6d5c53;
   --color-preparada: #d98207;
   --color-preparada-ink: #7c4a02;
-  --color-entregue: #17864f;
-  --color-entregue-ink: #0c5c34;
-  --color-paga: #1d4ed8;
-  --color-paga-ink: #16307a;
-  --color-paga-soft: #e6efff;
+  --color-entregue: #1d4ed8;
+  --color-entregue-ink: #16307a;
+  --color-entregue-soft: #e6efff;
+  --color-paga: #15803d;
+  --color-paga-ink: #0b4f24;
+  --color-paga-soft: #d1fae5;
   --color-cancelada: #c02635;
   --color-cancelada-ink: #8a1522;
 
@@ -47,7 +48,7 @@
   --radius-card: 22px;
 
   --shadow-suave: 0 1px 2px rgb(82 16 17 / 0.05), 0 10px 26px -14px rgb(82 16 17 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.85);
-  --shadow-elevado: 0 2px 6px rgb(82 16 17 / 0.08), 0 20px 44px -18px rgb(82 16 17 / 0.32), inset 0 1px 0 rgb(255 255 255 / 0.22);
+  --shadow-elevado: 0 2px 6px rgb(82 16 17 / 0.08), 0 20px 44px -18px rgb(82 16 17 / 0.32);
   --shadow-dentro: inset 0 1px 2px rgb(82 16 17 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.6);
 
   --ease-molas: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -106,7 +107,6 @@
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  color-scheme: light;
 }
 
 * {
@@ -117,11 +117,12 @@ html,
 body {
   height: 100%;
   overflow-x: clip;
+  background-color: var(--color-brand);
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
-  background: var(--color-crema);
   color: var(--color-tinta);
   font-family: var(--font-sans);
   font-feature-settings: "cv11", "ss01";
@@ -129,15 +130,22 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Fundo com o "vapor" quente da cozinha, bem sutil. */
+.fundo-quente {
+  color-scheme: light;
+}
+
+/* Garante que popups/toasts no topo nunca fiquem cortados pela ilha/notch ou cabeçalho */
+[data-sonner-toaster][data-y-position="top"] {
+  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
+}
+
+/* Fundo com o "vapor" quente da cozinha apenas na metade inferior, sem clarear o topo. */
 .fundo-quente::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(120% 60% at 50% -10%, rgb(251 160 17 / 0.14), transparent 62%),
-    radial-gradient(90% 50% at 100% 100%, rgb(82 16 17 / 0.07), transparent 70%);
+  background: radial-gradient(90% 50% at 100% 100%, rgb(82 16 17 / 0.06), transparent 70%);
 }
 
 .num {

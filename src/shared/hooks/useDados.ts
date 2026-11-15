@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { repo } from "@/data";
-import type { Categoria, Conta, DiaVenda, Entregador, Movimentacao, Usuario, Venda } from "@/domain/types";
+import { calcularTotais } from "@/domain/totais";
+import type { Categoria, Conta, DiaVenda, Entregador, Movimentacao, ResumoDia, Usuario, Venda } from "@/domain/types";
 
 export const chaves = {
   usuarios: ["usuarios"] as const,
@@ -40,10 +41,25 @@ export function useSalvarDia(data: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dia: DiaVenda) => repo.salvarDia(dia),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: chaves.dia(data) });
-      qc.invalidateQueries({ queryKey: ["dias"] });
-      qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] });
+    onMutate: async (novoDia) => {
+      await qc.cancelQueries({ queryKey: chaves.dia(data) });
+      const anterior = qc.getQueryData<ResumoDia>(chaves.dia(data));
+      if (anterior) {
+        qc.setQueryData<ResumoDia>(chaves.dia(data), {
+          ...anterior,
+          dia: novoDia,
+          totais: calcularTotais(anterior.vendas, novoDia.precoMarmita),
+        });
+      }
+      return { anterior };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.anterior) qc.setQueryData(chaves.dia(data), ctx.anterior);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: chaves.dia(data) });
+      void qc.invalidateQueries({ queryKey: ["dias"] });
+      void qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] });
     },
   });
 }
@@ -52,10 +68,32 @@ export function useSalvarVendas(data: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vendas: Venda[]) => repo.salvarVendas(vendas),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: chaves.dia(data) });
-      qc.invalidateQueries({ queryKey: ["dias"] });
-      qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] });
+    onMutate: async (novas) => {
+      await qc.cancelQueries({ queryKey: chaves.dia(data) });
+      const anterior = qc.getQueryData<ResumoDia>(chaves.dia(data));
+      if (anterior) {
+        const mapa = new Map(anterior.vendas.map((v) => [v.id, v]));
+        let maxOrdem = Math.max(0, ...anterior.vendas.map((v) => v.ordem));
+        for (const v of novas) {
+          const existente = mapa.get(v.id);
+          mapa.set(v.id, existente ? { ...v, ordem: existente.ordem } : { ...v, ordem: ++maxOrdem });
+        }
+        const lista = [...mapa.values()].sort((a, b) => a.ordem - b.ordem);
+        qc.setQueryData<ResumoDia>(chaves.dia(data), {
+          ...anterior,
+          vendas: lista,
+          totais: calcularTotais(lista, anterior.dia.precoMarmita),
+        });
+      }
+      return { anterior };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.anterior) qc.setQueryData(chaves.dia(data), ctx.anterior);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: chaves.dia(data) });
+      void qc.invalidateQueries({ queryKey: ["dias"] });
+      void qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] });
     },
   });
 }
@@ -64,9 +102,25 @@ export function useRemoverVenda(data: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => repo.removerVenda(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: chaves.dia(data) });
-      qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] });
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: chaves.dia(data) });
+      const anterior = qc.getQueryData<ResumoDia>(chaves.dia(data));
+      if (anterior) {
+        const lista = anterior.vendas.filter((v) => v.id !== id);
+        qc.setQueryData<ResumoDia>(chaves.dia(data), {
+          ...anterior,
+          vendas: lista,
+          totais: calcularTotais(lista, anterior.dia.precoMarmita),
+        });
+      }
+      return { anterior };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.anterior) qc.setQueryData(chaves.dia(data), ctx.anterior);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: chaves.dia(data) });
+      void qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] });
     },
   });
 }

@@ -204,6 +204,8 @@ async function comFila(
   }
 }
 
+const diasGarantidos = new Set<string>();
+
 export const repositorioSupabase: Repositorio = {
   async usuarios() {
     const { data, error } = await cliente().from("perfis").select("*").order("nome");
@@ -339,9 +341,15 @@ export const repositorioSupabase: Repositorio = {
   async diaPorData(data) {
     const { data: linha, error } = await cliente().from("dias_venda").select("*").eq("data", data).maybeSingle();
     if (error && tabelaAusente(error)) return repositorioDemo.diaPorData(data);
-    return linha ? paraDia(linha) : null;
+    if (linha) {
+      const d = paraDia(linha);
+      diasGarantidos.add(d.id);
+      return d;
+    }
+    return null;
   },
   async salvarDia(dia) {
+    diasGarantidos.add(dia.id);
     await comFila(
       "dias_venda",
       "upsert",
@@ -396,7 +404,7 @@ export const repositorioSupabase: Repositorio = {
     if (!vendas.length) return;
     // Garante que o dia existe em dias_venda antes de gravar as vendas (chave estrangeira dia_id)
     const diaId = vendas[0]?.diaId;
-    if (diaId && diaId.startsWith("dia_")) {
+    if (diaId && diaId.startsWith("dia_") && !diasGarantidos.has(diaId)) {
       const dataIso = diaId.slice(4);
       if (/^\d{4}-\d{2}-\d{2}$/.test(dataIso)) {
         const diaExistente = await this.diaPorData(dataIso);
@@ -409,6 +417,7 @@ export const repositorioSupabase: Repositorio = {
             criadoEm: new Date().toISOString(),
           });
         }
+        diasGarantidos.add(diaId);
       }
     }
     const linhas = vendas.map(linhaVenda);
@@ -469,7 +478,6 @@ export const repositorioSupabase: Repositorio = {
     const { data: linhasVenda, error } = await cliente()
       .from("vendas")
       .select("*")
-      .eq("pg", true)
       .neq("status", "cancelada");
     if (error) {
       if (tabelaAusente(error)) return repositorioDemo.vendasEmAberto(hoje);

@@ -103,6 +103,7 @@ export function TelaPainel() {
   const [periodo, setPeriodo] = useState<Periodo>("sete");
   const [diaDetalhe, setDiaDetalhe] = useState<ResumoDia | null>(null);
   const [cobrando, setCobrando] = useState<VendaEmAberto | null>(null);
+  const [filtroDiaCobranca, setFiltroDiaCobranca] = useState<string>("todos");
 
   const { de, ate } = useMemo(() => intervalo(periodo, hoje), [periodo, hoje]);
 
@@ -434,35 +435,77 @@ export function TelaPainel() {
             <Esqueleto className="h-14" />
           </div>
         ) : gruposCobranca.length === 0 ? (
-          <Cartao className="flex items-center gap-2.5 border-entregue/40 bg-entregue/8 px-4 py-3">
-            <Check size={16} className="shrink-0 text-entregue" />
-            <p className="min-w-0 truncate text-[12.5px] font-semibold text-entregue-ink">
-              Nenhuma marmita fiada — tudo que foi PG já virou dinheiro.
+          <Cartao className="flex items-center gap-2.5 border-paga/40 bg-paga-soft/60 px-4 py-3">
+            <Check size={16} className="shrink-0 text-paga" />
+            <p className="min-w-0 truncate text-[12.5px] font-semibold text-paga-ink">
+              Nenhuma marmita pendente — todos os pedidos já foram pagos.
             </p>
           </Cartao>
         ) : (
-          gruposCobranca.map((g) => (
-            <div key={g.data} className="flex flex-col gap-2">
-              <div className="flex items-baseline justify-between gap-2 px-1">
-                <h3 className="min-w-0 truncate text-[12px] font-semibold text-tinta-2">{rotuloRelativo(g.data)}</h3>
-                <span className="num shrink-0 whitespace-nowrap text-[11.5px] font-bold text-preparada-ink">
-                  {soValor(g.soma)}
-                </span>
-              </div>
-              <motion.div
-                variants={listaStagger}
-                initial={reduzido ? "visivel" : "oculto"}
-                animate="visivel"
-                className="flex flex-col gap-2"
+          <>
+            <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  vibrar(6);
+                  setFiltroDiaCobranca("todos");
+                }}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                  filtroDiaCobranca === "todos"
+                    ? "border-brand bg-brand text-crema"
+                    : "border-line bg-white text-tinta-2",
+                )}
               >
-                <AnimatePresence initial={false}>
-                  {g.itens.map((item) => (
-                    <LinhaCobranca key={item.venda.id} item={item} aoReceber={() => setCobrando(item)} />
-                  ))}
-                </AnimatePresence>
-              </motion.div>
+                Todos os dias ({gruposCobranca.reduce((s, g) => s + g.itens.length, 0)})
+              </button>
+              {gruposCobranca.map((g) => (
+                <button
+                  key={g.data}
+                  type="button"
+                  onClick={() => {
+                    vibrar(6);
+                    setFiltroDiaCobranca(g.data);
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                    filtroDiaCobranca === g.data
+                      ? "border-brand bg-brand text-crema"
+                      : "border-line bg-white text-tinta-2",
+                  )}
+                >
+                  {rotuloRelativo(g.data)} · {dataCurta(g.data)} ({g.itens.length})
+                </button>
+              ))}
             </div>
-          ))
+
+            {gruposCobranca
+              .filter((g) => filtroDiaCobranca === "todos" || g.data === filtroDiaCobranca)
+              .map((g) => (
+                <div key={g.data} className="flex flex-col gap-2">
+                  <div className="flex items-baseline justify-between gap-2 px-1">
+                    <h3 className="min-w-0 truncate text-[12px] font-semibold text-tinta-2">
+                      {rotuloRelativo(g.data)} · {dataCurta(g.data)}
+                    </h3>
+                    <span className="num shrink-0 whitespace-nowrap text-[11.5px] font-bold text-preparada-ink">
+                      {soValor(g.soma)}
+                    </span>
+                  </div>
+                  <motion.div
+                    variants={listaStagger}
+                    initial={reduzido ? "visivel" : "oculto"}
+                    animate="visivel"
+                    className="flex flex-col gap-2"
+                  >
+                    <AnimatePresence initial={false}>
+                      {g.itens.map((item) => (
+                        <LinhaCobranca key={item.venda.id} item={item} aoReceber={() => setCobrando(item)} />
+                      ))}
+                    </AnimatePresence>
+                  </motion.div>
+                </div>
+              ))}
+          </>
         )}
       </motion.section>
 

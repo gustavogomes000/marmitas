@@ -51,9 +51,9 @@ const ATALHOS_RAPIDOS = [
 function DataHoje() {
   const hoje = hojeISO();
   return (
-    <div className="hidden text-right leading-tight min-[380px]:block">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-gold/90">{diaDaSemana(hoje)}</p>
-      <p className="text-[11px] font-medium text-crema/75">{dataLonga(hoje).split(", ")[1]}</p>
+    <div className="hidden text-right leading-tight min-[360px]:block">
+      <p className="text-[11px] font-extrabold uppercase tracking-wider text-gold">{diaDaSemana(hoje)}</p>
+      <p className="mt-0.5 text-[12px] font-semibold text-crema/85">{dataLonga(hoje).split(", ")[1]}</p>
     </div>
   );
 }
@@ -89,8 +89,9 @@ export function Layout({ children, extras }: { children: ReactNode; extras?: Rea
 
   return (
     <div className="fundo-quente relative flex min-h-dvh flex-col bg-crema">
-      <header className="sticky top-0 z-30 bg-brand/96 text-crema shadow-elevado backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-[600px] items-center justify-between gap-2 px-3.5 pb-2.5 pt-[calc(0.55rem+var(--safe-top))]">
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[var(--safe-top)] bg-brand" />
+      <header className="sticky top-0 z-30 bg-brand text-crema shadow-[0_12px_30px_-14px_rgba(53,7,10,0.55)]">
+        <div className="mx-auto flex w-full max-w-[600px] items-center justify-between gap-2.5 px-4 pb-3.5 pt-[calc(0.8rem+var(--safe-top))]">
           <Link
             to="/dia"
             onClick={() => vibrar(6)}
@@ -252,34 +253,34 @@ function AtalhoTopo({
   corBadge: string;
 }) {
   return (
-    <NavLink
-      to={para}
-      onClick={() => vibrar(6)}
-      aria-label={`${rotulo}${badge > 0 ? ` (${badge})` : ""}`}
-      className={cn(
-        "relative flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-semibold transition-all active:scale-95",
-        ativo
-          ? "border-gold bg-gold text-brand-ink shadow-suave"
-          : "border-crema/18 bg-crema/10 text-crema/90 hover:bg-crema/15",
-      )}
-    >
-      <Icone size={14} strokeWidth={2.2} />
-      <span className="hidden min-[430px]:inline">{rotulo}</span>
-      {badge > 0 && (
-        <motion.span
-          key={badge}
-          initial={{ scale: 0.6 }}
-          animate={{ scale: 1 }}
-          transition={MOLINHO}
-          className={cn(
-            "num grid min-w-[17px] place-items-center rounded-full px-1 py-px text-[10px] font-extrabold leading-none",
-            ativo ? "bg-brand text-crema" : corBadge,
-          )}
-        >
-          {badge}
-        </motion.span>
-      )}
-    </NavLink>
+      <NavLink
+        to={para}
+        onClick={() => vibrar(6)}
+        aria-label={`${rotulo}${badge > 0 ? ` (${badge})` : ""}`}
+        className={cn(
+          "relative flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-bold transition-all active:scale-95",
+          ativo
+            ? "border-gold bg-gold text-brand-ink shadow-suave"
+            : "border-crema/20 bg-crema/10 text-crema hover:bg-crema/15",
+        )}
+      >
+        <Icone size={15} strokeWidth={2.3} />
+        <span className="hidden min-[420px]:inline">{rotulo}</span>
+        {badge > 0 && (
+          <motion.span
+            key={badge}
+            initial={{ scale: 0.6 }}
+            animate={{ scale: 1 }}
+            transition={MOLINHO}
+            className={cn(
+              "num grid min-w-[19px] place-items-center rounded-full px-1.5 py-0.5 text-[10.5px] font-extrabold leading-none",
+              ativo ? "bg-brand text-crema" : corBadge,
+            )}
+          >
+            {badge}
+          </motion.span>
+        )}
+      </NavLink>
   );
 }
 

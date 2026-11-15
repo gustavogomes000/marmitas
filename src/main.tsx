@@ -46,9 +46,16 @@ createRoot(document.getElementById("root")!).render(
         </FronteiraErro>
         <Toaster
           position="top-center"
-          offset={{ top: "calc(env(safe-area-inset-top, 0px) + 62px)" }}
+          offset={{ top: "calc(env(safe-area-inset-top, 0px) + 64px)", left: 16, right: 16 }}
+          mobileOffset={{ top: "calc(env(safe-area-inset-top, 0px) + 64px)", left: 14, right: 14 }}
           toastOptions={{
-            style: { borderRadius: 16, border: "1px solid #EADDD1", background: "#fff", color: "#241C19", boxShadow: "0 18px 40px -18px rgba(82,16,17,.32)" },
+            style: {
+              borderRadius: 16,
+              border: "1px solid #EADDD1",
+              background: "#fff",
+              color: "#241C19",
+              boxShadow: "0 18px 40px -18px rgba(82,16,17,.32)",
+            },
           }}
         />
       </BrowserRouter>
@@ -58,8 +65,17 @@ createRoot(document.getElementById("root")!).render(
 
 const splash = document.getElementById("tela-splash");
 if (splash) {
-  window.setTimeout(() => {
-    splash.classList.add("saindo");
-    window.setTimeout(() => splash.remove(), 500);
-  }, 1150);
+  const finalizarSplash = () => {
+    window.setTimeout(() => {
+      splash.classList.add("saindo");
+      window.setTimeout(() => splash.remove(), 680);
+    }, 3000);
+  };
+  const img = splash.querySelector("img");
+  if (img && !img.complete) {
+    img.addEventListener("load", finalizarSplash, { once: true });
+    img.addEventListener("error", finalizarSplash, { once: true });
+  } else {
+    finalizarSplash();
+  }
 }

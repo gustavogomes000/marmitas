@@ -986,35 +986,6 @@ function PainelMovimentacao({
           erro={erroValor}
           onClick={() => setTecladoAberto((atual) => !atual)}
         />
-        <div className="flex flex-wrap gap-1.5">
-          {[10, 20, 50, 100].map((soma) => (
-            <button
-              key={soma}
-              type="button"
-              onClick={() => {
-                vibrar(6);
-                const novo = Math.round((valor + soma) * 100) / 100;
-                setValorTexto(novo ? String(novo).replace(".", ",") : "0");
-                if (erroValor) setErroValor(undefined);
-              }}
-              className="num rounded-full border border-line bg-crema-2/80 px-2.5 py-1 text-[11.5px] font-bold text-tinta-2 transition-transform active:scale-95 active:bg-brand-soft active:text-brand"
-            >
-              +R$ {soma}
-            </button>
-          ))}
-          {valor > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                vibrar(6);
-                setValorTexto("0");
-              }}
-              className="rounded-full border border-line bg-white px-2.5 py-1 text-[11.5px] font-semibold text-tinta-3 active:scale-95"
-            >
-              Zerar
-            </button>
-          )}
-        </div>
         <MensagemErro mensagem={erroValor} />
         <TecladoRecolhido aberto={tecladoAberto}>
           <TecladoNumero

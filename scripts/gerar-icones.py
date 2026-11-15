@@ -119,9 +119,17 @@ def salvar_arquivo(nome: str, marca: Image.Image, margem: float) -> None:
 
 
 def icone(arquivo: str, tamanho: int, proporcao: float, forma: str) -> None:
-    marca = _escala_cabendo(_marca("panela", _so_panela), tamanho * proporcao)
-    tela = Image.new("RGBA", (tamanho, tamanho), (0, 0, 0, 0))
-    ImageDraw.Draw(tela).rectangle([0, 0, tamanho, tamanho], fill=BORGOGNHA + (255,))
+    img = Image.open(FONTE).convert("RGB")
+    # Recorta a arte completa da logo original (panela + D'a Márcia + Marmitaria)
+    arte = img.crop(_caixa(img))
+    alvo = round(tamanho * proporcao)
+    escala = alvo / max(arte.width, arte.height)
+    redim = arte.resize(
+        (max(1, round(arte.width * escala)), max(1, round(arte.height * escala))),
+        Image.LANCZOS,
+    )
+    tela = Image.new("RGBA", (tamanho, tamanho), BORGOGNHA + (255,))
+    tela.paste(redim, ((tamanho - redim.width) // 2, (tamanho - redim.height) // 2))
     if forma != "quadrado":
         mascara = Image.new("L", (tamanho, tamanho), 0)
         ImageDraw.Draw(mascara).rounded_rectangle(
@@ -130,7 +138,6 @@ def icone(arquivo: str, tamanho: int, proporcao: float, forma: str) -> None:
             fill=255,
         )
         tela.putalpha(mascara)
-    tela.alpha_composite(marca, ((tamanho - marca.width) // 2, (tamanho - marca.height) // 2))
     tela.save(SAIDA / arquivo)
     print("gerado", arquivo, f"{tamanho}x{tamanho}")
 
@@ -139,8 +146,10 @@ if __name__ == "__main__":
     salvar_arquivo("logo.png", _marca("logo", _caixa), 0.02)
     salvar_arquivo("simbolo.png", _marca("panela", _so_panela), 0.02)
     salvar_arquivo("lettering.png", _marca("lettering", _lettering), 0.02)
-    icone("marca-192.png", 192, 0.74, "arredondado")
-    icone("marca-512.png", 512, 0.74, "arredondado")
-    icone("marca-maskable-512.png", 512, 0.62, "quadrado")
-    icone("apple-touch-icon.png", 180, 0.62, "quadrado")
-    icone("pwa-64x64.png", 64, 0.86, "circulo")
+    icone("marca-1024.png", 1024, 0.82, "quadrado")
+    icone("marca-512.png", 512, 0.82, "quadrado")
+    icone("marca-192.png", 192, 0.82, "quadrado")
+    icone("marca-maskable-512.png", 512, 0.72, "quadrado")
+    icone("apple-touch-icon.png", 180, 0.82, "quadrado")
+    icone("pwa-64x64.png", 64, 0.86, "quadrado")
+    icone("favicon-32.png", 32, 0.88, "quadrado")
