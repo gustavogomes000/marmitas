@@ -126,6 +126,23 @@ export function TelaDia() {
   const nomeDoEntregador = (id: string | null) =>
     id ? (entregadores.data ?? []).find((e) => e.id === id)?.nome ?? "removido" : null;
 
+  // Mantém a posição de cada pedido travada na tela enquanto muda entre Pendente, Preparada e Entregue.
+  // O pedido só muda de posição (desce para o final) quando é marcado como Pago.
+  const posicoesDiaRef = useRef<{ data: string; mapa: Map<string, number>; contador: number }>({
+    data,
+    mapa: new Map(),
+    contador: 0,
+  });
+  if (posicoesDiaRef.current.data !== data) {
+    posicoesDiaRef.current = { data, mapa: new Map(), contador: 0 };
+  }
+  for (const v of vendas) {
+    if (!posicoesDiaRef.current.mapa.has(v.id)) {
+      posicoesDiaRef.current.contador += 1;
+      posicoesDiaRef.current.mapa.set(v.id, v.ordem > 0 ? v.ordem : posicoesDiaRef.current.contador);
+    }
+  }
+
   const filtradas = useMemo(() => {
     const termo = normalizar(busca);
     let lista = vendas;
@@ -138,10 +155,15 @@ export function TelaDia() {
     return [...lista].sort((a, b) => {
       const grupo = (v: Venda) => {
         if (v.status === "cancelada") return 2;
-        if (v.paga && faltaReceber(v, preco) <= 0) return 1;
+        if (v.paga) return 1;
         return 0;
       };
-      return grupo(a) - grupo(b) || a.ordem - b.ordem;
+      const ga = grupo(a);
+      const gb = grupo(b);
+      if (ga !== gb) return ga - gb;
+      const pa = posicoesDiaRef.current.mapa.get(a.id) ?? a.ordem;
+      const pb = posicoesDiaRef.current.mapa.get(b.id) ?? b.ordem;
+      return pa - pb || a.ordem - b.ordem || a.id.localeCompare(b.id);
     });
   }, [vendas, busca, filtro, preco]);
 

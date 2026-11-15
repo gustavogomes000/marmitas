@@ -67,23 +67,55 @@ export function useSalvarDia(data: string) {
 export function useSalvarVendas(data: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vendas: Venda[]) => repo.salvarVendas(vendas),
+    mutationFn: async (novas: Venda[]) => {
+      const atual = qc.getQueryData<ResumoDia>(chaves.dia(data));
+      if (atual) {
+        const mapaAtual = new Map(atual.vendas.map((v) => [v.id, v]));
+        const comOrdem = novas.map((v) => mapaAtual.get(v.id) ?? v);
+        await repo.salvarVendas(comOrdem);
+        return;
+      }
+      await repo.salvarVendas(novas);
+    },
     onMutate: async (novas) => {
       await qc.cancelQueries({ queryKey: chaves.dia(data) });
       const anterior = qc.getQueryData<ResumoDia>(chaves.dia(data));
       if (anterior) {
-        const mapa = new Map(anterior.vendas.map((v) => [v.id, v]));
-        let maxOrdem = Math.max(0, ...anterior.vendas.map((v) => v.ordem));
+        // Garante que todos os pedidos existentes tenham uma ordem sequencial única (1, 2, 3...)
+        const baseNormalizada = anterior.vendas.map((v, idx) => ({
+          ...v,
+          ordem: v.ordem > 0 ? v.ordem : idx + 1,
+        }));
+        // Se havia ordens repetidas (ex.: todos 0), renumera na sequência atual da tela
+        const ordensVistas = new Set<number>();
+        let temDuplicada = false;
+        for (const v of baseNormalizada) {
+          if (ordensVistas.has(v.ordem)) {
+            temDuplicada = true;
+            break;
+          }
+          ordensVistas.add(v.ordem);
+        }
+        const base = temDuplicada
+          ? anterior.vendas.map((v, idx) => ({ ...v, ordem: idx + 1 }))
+          : baseNormalizada;
+
+        const mapa = new Map(base.map((v) => [v.id, v]));
+        let maxOrdem = Math.max(0, ...base.map((v) => v.ordem));
         for (const v of novas) {
           const existente = mapa.get(v.id);
-          mapa.set(v.id, existente ? { ...v, ordem: existente.ordem } : { ...v, ordem: ++maxOrdem });
+          mapa.set(v.id, existente ? { ...v, ordem: existente.ordem } : { ...v, ordem: v.ordem > 0 ? v.ordem : ++maxOrdem });
         }
-        const lista = [...mapa.values()].sort((a, b) => a.ordem - b.ordem);
+        const lista = [...mapa.values()].sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id));
         qc.setQueryData<ResumoDia>(chaves.dia(data), {
           ...anterior,
           vendas: lista,
           totais: calcularTotais(lista, anterior.dia.precoMarmita),
         });
+        // Se normalizou ordens antigas que estavam zeradas, persiste todas no banco para travar a posição
+        if (temDuplicada && lista.length > novas.length) {
+          void repo.salvarVendas(lista);
+        }
       }
       return { anterior };
     },

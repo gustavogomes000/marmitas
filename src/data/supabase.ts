@@ -392,7 +392,12 @@ export const repositorioSupabase: Repositorio = {
       obs: "",
       criadoEm: new Date().toISOString(),
     };
-    const { data: linhas, error } = await cliente().from("vendas").select("*").eq("dia_id", dia.id).order("ordem");
+    const { data: linhas, error } = await cliente()
+      .from("vendas")
+      .select("*")
+      .eq("dia_id", dia.id)
+      .order("ordem", { ascending: true })
+      .order("id", { ascending: true });
     if (error) {
       if (tabelaAusente(error)) return repositorioDemo.vendasDoDia(data);
       throw error;
@@ -468,7 +473,9 @@ export const repositorioSupabase: Repositorio = {
       if (tabelaAusente(erroVenda)) return repositorioDemo.resumosPeriodo(de, ate);
       throw erroVenda;
     }
-    const vendas = (linhasVenda ?? []).map((l) => paraVenda(l)).sort((a, b) => a.ordem - b.ordem);
+    const vendas = (linhasVenda ?? [])
+      .map((l) => paraVenda(l))
+      .sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id));
     return dias.map((dia) => {
       const doDia = vendas.filter((v) => v.diaId === dia.id);
       return { dia, vendas: doDia, totais: calcularTotais(doDia, dia.precoMarmita) } satisfies ResumoDia;

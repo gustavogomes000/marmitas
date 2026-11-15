@@ -84,9 +84,9 @@ export function TelaEntregas() {
     if (soSem) filtrada = filtrada.filter((v) => !v.entreguePor);
     else if (aba !== "todos") filtrada = filtrada.filter((v) => v.entreguePor === aba);
     return [...filtrada].sort((a, b) => {
-      const da = a.status === "entregue" ? 1 : 0;
-      const db = b.status === "entregue" ? 1 : 0;
-      return da - db || a.ordem - b.ordem;
+      const da = a.paga ? 1 : 0;
+      const db = b.paga ? 1 : 0;
+      return da - db || a.ordem - b.ordem || a.id.localeCompare(b.id);
     });
   }, [ativas, soSem, aba]);
 

@@ -24,9 +24,6 @@ const FILTROS: { valor: FiltroStatus; rotulo: string }[] = [
   { valor: "entregue", rotulo: "Entregues" },
 ];
 
-/** A cozinha lê o dia de cima para baixo: o que falta primeiro. */
-const RANK: Record<StatusVenda, number> = { pendente: 0, preparada: 1, entregue: 2, cancelada: 3 };
-
 const FUNDO_LINHA: Record<StatusVenda, string> = {
   pendente: "border-line bg-white",
   preparada: "border-gold-300 bg-gold-soft/70",
@@ -72,11 +69,11 @@ export function TelaCozinha() {
     return vendas
       .filter((v) => (filtro === "todas" ? true : v.status === filtro))
       .filter((v) => (termo ? normalizar(v.cliente).includes(termo) : true))
-      .sort(
-        (a, b) =>
-          RANK[a.status] - RANK[b.status] ||
-          a.cliente.localeCompare(b.cliente, "pt-BR", { sensitivity: "base" }),
-      );
+      .sort((a, b) => {
+        const ga = a.status === "cancelada" ? 2 : a.paga ? 1 : 0;
+        const gb = b.status === "cancelada" ? 2 : b.paga ? 1 : 0;
+        return ga - gb || a.ordem - b.ordem || a.id.localeCompare(b.id);
+      });
   }, [vendas, filtro, busca]);
 
   function abrirEdicao(venda: Venda) {
