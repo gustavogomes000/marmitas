@@ -1,9 +1,12 @@
 import { Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CalendarDays, ChevronRight, Minus, PiggyBank, Plus, RotateCcw, Trash2, Wallet } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, CircleDollarSign, Minus, PiggyBank, Plus, RotateCcw, Trash2, Wallet } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { Categoria, Fluxo, FormaPagamento, Movimentacao } from "@/domain/types";
+import type { Categoria, Fluxo, FormaPagamento, Movimentacao, VendaEmAberto } from "@/domain/types";
+import { repo } from "@/data";
+import { nomeParaExibir } from "@/domain/parser";
+import { idMovimentacaoPagamento } from "@/domain/totais";
 import {
   Barra,
   Botao,
@@ -23,10 +26,11 @@ import {
   useMovimentacoes,
   useRemoverMovimentacao,
   useSalvarMovimentacao,
+  useVendasEmAberto,
 } from "@/shared/hooks/useDados";
 import { vibrar } from "@/shared/hooks/useAnimacao";
 import { cn } from "@/shared/lib/cn";
-import { dataCurta, hojeISO, moeda, paraISO, paraNumero, rotuloRelativo } from "@/shared/lib/format";
+import { dataCurta, hojeISO, moeda, normalizar, paraISO, paraNumero, rotuloRelativo } from "@/shared/lib/format";
 import { MOLINHO, SUAVE, apertar, itemLista, listaStagger, subir } from "@/shared/lib/motion";
 import { uid } from "@/shared/lib/storage";
 
@@ -76,10 +80,77 @@ export function TelaCaixa() {
   const historico = useMovimentacoes(de, ate);
   const diaDeHoje = useDia(hoje);
   const categorias = useCategorias();
+  const vendasEmAbertoQ = useVendasEmAberto(hoje);
   const qc = useQueryClient();
 
   const [painel, setPainel] = useState<Painel | null>(null);
   const [saldo, setSaldo] = useState<{ aberto: boolean; seq: number }>({ aberto: false, seq: 0 });
+  const [cobrancasAberta, setCobrancasAberta] = useState(false);
+  const [diaCobrancaRapida, setDiaCobrancaRapida] = useState<string>("todos");
+  const [recebendoId, setRecebendoId] = useState<string | null>(null);
+
+  const emAbertoGeral = useMemo(() => vendasEmAbertoQ.data ?? [], [vendasEmAbertoQ.data]);
+  const totalEmAbertoGeral = useMemo(
+    () => emAbertoGeral.reduce((s, item) => s + item.valor, 0),
+    [emAbertoGeral],
+  );
+  const diasEmAberto = useMemo(() => {
+    const mapa = new Map<string, { data: string; qtd: number; soma: number }>();
+    for (const item of emAbertoGeral) {
+      const atual = mapa.get(item.dia.data) ?? { data: item.dia.data, qtd: 0, soma: 0 };
+      atual.qtd += 1;
+      atual.soma += item.valor;
+      mapa.set(item.dia.data, atual);
+    }
+    return [...mapa.values()].sort((a, b) => (a.data < b.data ? 1 : -1));
+  }, [emAbertoGeral]);
+
+  const emAbertoResumo = useMemo(() => {
+    const base =
+      diaCobrancaRapida === "todos"
+        ? emAbertoGeral
+        : emAbertoGeral.filter((i) => i.dia.data === diaCobrancaRapida);
+    return base.slice(0, 5);
+  }, [emAbertoGeral, diaCobrancaRapida]);
+
+  async function receberNoCaixa(item: VendaEmAberto, forma: FormaPagamento = "pix") {
+    try {
+      setRecebendoId(item.venda.id);
+      vibrar([8, 20, 8]);
+      const categoriaVenda = (categorias.data ?? []).find((c) => c.fluxo === "entrada");
+      await repo.salvarVendas([
+        {
+          ...item.venda,
+          paga: true,
+          valorPago: (item.venda.valorPago ?? 0) + item.valor,
+        },
+      ]);
+      await repo.salvarMovimentacao({
+        id: idMovimentacaoPagamento(item.venda.id),
+        data: hoje,
+        descricao: `Marmitas — ${item.venda.cliente} (${dataCurta(item.dia.data)})`,
+        valor: item.valor,
+        fluxo: "entrada",
+        categoriaId: categoriaVenda?.id ?? "cat_venda",
+        forma,
+        obs: item.dia.data !== hoje ? `Recebido de ${dataCurta(item.dia.data)}` : "",
+        criadoEm: new Date().toISOString(),
+      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["vendas-em-aberto"] }),
+        qc.invalidateQueries({ queryKey: ["dia"] }),
+        qc.invalidateQueries({ queryKey: ["dias"] }),
+        qc.invalidateQueries({ queryKey: ["movimentacoes"] }),
+      ]);
+      toast.success(`${moeda(item.valor)} recebido no caixa!`, {
+        description: `${nomeParaExibir(item.venda.cliente)} · ${rotuloRelativo(item.dia.data)}`,
+      });
+    } catch {
+      toast.error("Não foi possível registrar o recebimento.");
+    } finally {
+      setRecebendoId(null);
+    }
+  }
 
   const recarregar = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["movimentacoes"] });
@@ -198,9 +269,6 @@ export function TelaCaixa() {
             <NumeroAnimado valor={caixaTotais.saldo} formatar={moeda} className="text-crema" />
           </motion.h1>
         )}
-        <p className="mt-2 text-[11.5px] leading-snug text-crema/75">
-          Total de tudo que já entrou e saiu, do começo até hoje. Não muda ao trocar o período.
-        </p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Marcador rotulo="Entradas" valor={caixaTotais.entradas} ponto="bg-entregue" />
           <Marcador rotulo="Saídas" valor={caixaTotais.saidas} ponto="bg-saida" />
@@ -241,9 +309,6 @@ export function TelaCaixa() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-semibold text-tinta">Ajustar saldo inicial</span>
-                  <span className="block text-[11.5px] leading-snug text-tinta-2">
-                    Quanto tinha no caixa/gaveta antes de começar a registrar.
-                  </span>
                 </span>
                 <Botao variante="dourado" tamanho="sm" onClick={abrirSaldo} className="shrink-0 gap-1">
                   Definir
@@ -259,9 +324,9 @@ export function TelaCaixa() {
         <TituloSecao>Hoje</TituloSecao>
         <Cartao className="mt-2 p-4">
           <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-2.5">
-            <LinhaValor rotulo="Recebi hoje" valor={caixaTotais.recebiHoje} cor="text-entregue" />
+            <LinhaValor rotulo="Recebi hoje" valor={caixaTotais.recebiHoje} cor="text-paga" />
             <LinhaValor rotulo="Gastei hoje" valor={caixaTotais.gasteiHoje} cor="text-saida" />
-            <LinhaValor rotulo="Falta receber (PG)" valor={aReceber} cor="text-paga" />
+            <LinhaValor rotulo="Falta receber hoje" valor={aReceber} cor="text-preparada-ink" />
           </div>
           <div className="mt-3.5 flex items-center justify-between gap-2 rounded-2xl bg-brand/6 px-3.5 py-3 ring-1 ring-brand/15">
             <span className="min-w-0 truncate text-[12.5px] font-semibold uppercase tracking-[0.07em] text-brand">
@@ -271,6 +336,143 @@ export function TelaCaixa() {
               <NumeroAnimado valor={ficoHoje} formatar={moeda} />
             </span>
           </div>
+        </Cartao>
+      </motion.section>
+
+      <motion.section variants={subir} initial="oculto" animate="visivel" className="flex flex-col gap-2">
+        <TituloSecao
+          acao={
+            emAbertoGeral.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  vibrar(6);
+                  setCobrancasAberta(true);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold text-brand"
+              >
+                Ver todos ({emAbertoGeral.length})
+                <ChevronRight size={14} />
+              </button>
+            ) : undefined
+          }
+        >
+          Faltando pagar (por dia)
+        </TituloSecao>
+
+        <Cartao className="flex flex-col gap-3 p-3.5">
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-gold-300 bg-gold-soft/75 px-3.5 py-2.5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gold text-brand-ink">
+                <CircleDollarSign size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-bold text-tinta">
+                  {emAbertoGeral.length === 0
+                    ? "Ninguém faltando pagar"
+                    : `${emAbertoGeral.length} pedido${emAbertoGeral.length > 1 ? "s" : ""} em aberto`}
+                </p>
+                <p className="truncate text-[11.5px] text-tinta-2">
+                  {diasEmAberto.length > 0
+                    ? `Em ${diasEmAberto.length} dia${diasEmAberto.length > 1 ? "s" : ""}`
+                    : "Tudo em dia"}
+                </p>
+              </div>
+            </div>
+            <span className="num shrink-0 font-display text-[19px] font-bold text-brand">
+              {moeda(totalEmAbertoGeral)}
+            </span>
+          </div>
+
+          {diasEmAberto.length > 0 && (
+            <>
+              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    vibrar(6);
+                    setDiaCobrancaRapida("todos");
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1 text-[11.5px] font-bold transition-colors",
+                    diaCobrancaRapida === "todos"
+                      ? "border-brand bg-brand text-crema"
+                      : "border-line bg-white text-tinta-2",
+                  )}
+                >
+                  Todos ({emAbertoGeral.length})
+                </button>
+                {diasEmAberto.map((d) => {
+                  const ativo = diaCobrancaRapida === d.data;
+                  return (
+                    <button
+                      key={d.data}
+                      type="button"
+                      onClick={() => {
+                        vibrar(6);
+                        setDiaCobrancaRapida(d.data);
+                      }}
+                      className={cn(
+                        "shrink-0 rounded-full border px-3 py-1 text-[11.5px] font-bold transition-colors",
+                        ativo ? "border-brand bg-brand text-crema" : "border-line bg-white text-tinta-2",
+                      )}
+                    >
+                      {rotuloRelativo(d.data)} · {dataCurta(d.data)} ({d.qtd})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <ul className="flex flex-col divide-y divide-line">
+                {emAbertoResumo.map((item) => (
+                  <li key={item.venda.id} className="flex items-center justify-between gap-2 py-2 first:pt-0.5 last:pb-0.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[14px] font-bold text-tinta">
+                          {nomeParaExibir(item.venda.cliente)}
+                        </span>
+                        <span className="num rounded-full bg-crema-2 px-1.5 py-0.5 text-[10.5px] font-bold text-brand">
+                          ×{item.venda.qtd}
+                        </span>
+                      </div>
+                      <span className="block truncate text-[11.5px] text-tinta-3">
+                        {rotuloRelativo(item.dia.data)} · {dataCurta(item.dia.data)}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="num text-[13.5px] font-extrabold text-cancelada-ink">
+                        {moeda(item.valor)}
+                      </span>
+                      <Botao
+                        variante="sucesso"
+                        tamanho="sm"
+                        carregando={recebendoId === item.venda.id}
+                        className="h-8 rounded-full px-3 text-[11.5px]"
+                        onClick={() => void receberNoCaixa(item)}
+                      >
+                        <Check size={13} strokeWidth={2.8} />
+                        Receber
+                      </Botao>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <Botao
+                variante="neutro"
+                tamanho="sm"
+                larguraTotal
+                className="h-9 text-[12.5px]"
+                onClick={() => {
+                  vibrar(6);
+                  setCobrancasAberta(true);
+                }}
+              >
+                <CalendarDays size={15} />
+                Filtrar e buscar todos por dia ({emAbertoGeral.length})
+              </Botao>
+            </>
+          )}
         </Cartao>
       </motion.section>
 
@@ -311,7 +513,6 @@ export function TelaCaixa() {
           );
         })}
       </div>
-      <p className="-mt-2 px-1 text-[11.5px] text-tinta-3">O período muda só o histórico abaixo.</p>
 
       {gastos.length > 0 && (
         <motion.section variants={subir} initial="oculto" animate="visivel" className="flex flex-col gap-2.5">
@@ -395,7 +596,7 @@ export function TelaCaixa() {
         ) : (
           grupos.map((grupo) => (
             <div key={grupo.data} className="flex flex-col">
-              <div className="sticky top-[56px] z-20 flex items-center justify-between gap-2 bg-crema/92 px-1 py-1.5 backdrop-blur">
+              <div className="sticky top-0 z-20 flex items-center justify-between gap-2 bg-crema/95 px-1 py-1.5 backdrop-blur">
                 <h3 className="truncate font-display text-[13px] font-semibold text-brand">
                   {rotuloRelativo(grupo.data)}
                 </h3>
@@ -426,6 +627,18 @@ export function TelaCaixa() {
         )}
       </section>
 
+      <Sheet
+        aberto={cobrancasAberta}
+        aoFechar={() => setCobrancasAberta(false)}
+        titulo="Faltando pagar por dia"
+      >
+        <PainelCobrancasCaixa
+          itens={emAbertoGeral}
+          recebendoId={recebendoId}
+          aoReceber={(item, forma) => void receberNoCaixa(item, forma)}
+        />
+      </Sheet>
+
       {painel && (
         <PainelMovimentacao
           key={painel.seq}
@@ -446,6 +659,169 @@ export function TelaCaixa() {
         aoFechar={fecharSaldo}
         aoMutou={recarregar}
       />
+    </div>
+  );
+}
+
+function PainelCobrancasCaixa({
+  itens,
+  recebendoId,
+  aoReceber,
+}: {
+  itens: VendaEmAberto[];
+  recebendoId: string | null;
+  aoReceber: (item: VendaEmAberto, forma: FormaPagamento) => void;
+}) {
+  const [diaFiltro, setDiaFiltro] = useState<string>("todos");
+  const [busca, setBusca] = useState("");
+  const [formaPadrao, setFormaPadrao] = useState<FormaPagamento>("pix");
+
+  const diasComPendencia = useMemo(() => {
+    const mapa = new Map<string, { data: string; qtd: number; soma: number }>();
+    for (const item of itens) {
+      const atual = mapa.get(item.dia.data) ?? { data: item.dia.data, qtd: 0, soma: 0 };
+      atual.qtd += 1;
+      atual.soma += item.valor;
+      mapa.set(item.dia.data, atual);
+    }
+    return [...mapa.values()].sort((a, b) => (a.data < b.data ? 1 : -1));
+  }, [itens]);
+
+  const filtrados = useMemo(() => {
+    const termo = normalizar(busca);
+    return itens.filter((item) => {
+      if (diaFiltro !== "todos" && item.dia.data !== diaFiltro) return false;
+      if (termo && !normalizar(item.venda.cliente).includes(termo)) return false;
+      return true;
+    });
+  }, [itens, diaFiltro, busca]);
+
+  const totalFiltrado = filtrados.reduce((s, i) => s + i.valor, 0);
+
+  return (
+    <div className="flex flex-col gap-3.5 pb-2">
+      <div className="flex items-center justify-between rounded-2xl border border-gold-300 bg-gold-soft/75 px-3.5 py-2.5">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-preparada-ink">Total a receber</p>
+          <p className="text-[12px] text-tinta-2">{filtrados.length} pedido(s) em aberto</p>
+        </div>
+        <span className="num font-display text-[20px] font-bold text-preparada-ink">{moeda(totalFiltrado)}</span>
+      </div>
+
+      {diasComPendencia.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-tinta-3">
+            Filtrar por dia
+          </span>
+          <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                vibrar(6);
+                setDiaFiltro("todos");
+              }}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                diaFiltro === "todos" ? "border-brand bg-brand text-crema" : "border-line bg-white text-tinta-2",
+              )}
+            >
+              Todos ({itens.length})
+            </button>
+            {diasComPendencia.map((d) => {
+              const ativo = diaFiltro === d.data;
+              return (
+                <button
+                  key={d.data}
+                  type="button"
+                  onClick={() => {
+                    vibrar(6);
+                    setDiaFiltro(d.data);
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                    ativo ? "border-brand bg-brand text-crema" : "border-line bg-white text-tinta-2",
+                  )}
+                >
+                  {rotuloRelativo(d.data)} · {dataCurta(d.data)} ({d.qtd})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-tinta-3">
+          Forma do recebimento
+        </span>
+        <div className="grid grid-cols-4 gap-1.5">
+          {FORMAS.map((f) => {
+            const ativo = formaPadrao === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  vibrar(6);
+                  setFormaPadrao(f.id);
+                }}
+                className={cn(
+                  "rounded-xl border py-2 text-[12px] font-bold transition-colors",
+                  ativo ? "border-paga bg-paga text-white" : "border-line bg-white text-tinta-2",
+                )}
+              >
+                {f.rotulo}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Campo
+        rotulo="Buscar cliente"
+        dica="Digite o nome..."
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+      />
+
+      {filtrados.length === 0 ? (
+        <div className="rounded-2xl border border-paga/30 bg-paga-soft/60 p-4 text-center">
+          <p className="text-[13.5px] font-bold text-paga-ink">Ninguém faltando pagar!</p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {filtrados.map((item) => (
+            <li key={item.venda.id} className="card flex items-center justify-between gap-2.5 p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[15px] font-bold text-tinta">
+                    {nomeParaExibir(item.venda.cliente)}
+                  </span>
+                  <span className="num rounded-full bg-crema-2 px-2 py-0.5 text-[11px] font-bold text-brand">
+                    ×{item.venda.qtd}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11.5px] text-tinta-3">
+                  {rotuloRelativo(item.dia.data)} · {dataCurta(item.dia.data)}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="num text-[14px] font-extrabold text-cancelada-ink">{moeda(item.valor)}</span>
+                <Botao
+                  variante="sucesso"
+                  tamanho="sm"
+                  carregando={recebendoId === item.venda.id}
+                  className="h-9 rounded-full px-3 text-[12px]"
+                  onClick={() => aoReceber(item, formaPadrao)}
+                >
+                  <Check size={14} strokeWidth={2.8} />
+                  Receber
+                </Botao>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

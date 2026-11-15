@@ -158,11 +158,7 @@ function criarSeed(): Banco {
     { id: "usr_entrega", nome: "Rota de entrega", email: "entrega@marmitaria.com", papel: "entregador", ativo: true, criadoEm: isoHá(25), ultimoAcesso: isoHá(2) },
   ];
 
-  const entregadores: Entregador[] = [
-    { id: "ent_carlos", nome: "Carlos", telefone: "(31) 99911-2233", ativo: true },
-    { id: "ent_rafael", nome: "Rafael", telefone: "(31) 99922-3344", ativo: true },
-    { id: "ent_ju", nome: "Juliana", telefone: "(31) 99933-4455", ativo: true },
-  ];
+  const entregadores: Entregador[] = [];
 
   const dias: DiaVenda[] = [];
   const vendas: Venda[] = [];
@@ -194,7 +190,7 @@ function criarSeed(): Banco {
         qtd,
         pg: PG.has(nome) && (n + i) % 3 === 0,
         paga: !(PG.has(nome) && (n + i) % 3 === 0),
-        entreguePor: entregadores[(n + i) % entregadores.length].id,
+        entreguePor: null,
         status: "entregue",
         obs: "",
         ordem: n,
@@ -275,7 +271,7 @@ function criarSeed(): Banco {
       qtd,
       pg: PG.has(cliente),
       paga,
-      entreguePor: status === "entregue" ? entregadores[n % entregadores.length].id : null,
+      entreguePor: null,
       status,
       obs: "",
       ordem: n,

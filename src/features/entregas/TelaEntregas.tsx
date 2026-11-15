@@ -16,13 +16,8 @@ import {
   TituloSecao,
   Vazio,
 } from "@/shared/components/ui";
-import {
-  useDia,
-  useEntregadores,
-  useRemoverEntregador,
-  useSalvarEntregador,
-  useSalvarVendas,
-} from "@/shared/hooks/useDados";
+import { useDia, useEntregadores, useRemoverEntregador, useSalvarEntregador, useSalvarVendas } from "@/shared/hooks/useDados";
+import { useTitulo } from "@/app/Layout";
 import { hojeISO } from "@/shared/lib/format";
 import { MOLINHO, MOLINHO_FIRME, apertar } from "@/shared/lib/motion";
 import { vibrar } from "@/shared/hooks/useAnimacao";
@@ -40,6 +35,7 @@ function telHref(telefone: string): string {
 }
 
 export function TelaEntregas() {
+  useTitulo("Entregas");
   const hoje = hojeISO();
   const diaQ = useDia(hoje);
   const entQ = useEntregadores();
@@ -153,20 +149,28 @@ export function TelaEntregas() {
   }
 
   function salvarCadastro(d: Entregador) {
+    const ehNovo = folha?.novo ?? true;
+    setFolha(null);
     salvarE.mutate(d, {
       onSuccess: () =>
-        toast.success(folha?.novo ? "Entregador cadastrado" : "Entregador atualizado", {
+        toast.success(ehNovo ? "Entregador cadastrado" : "Entregador atualizado", {
           description: d.nome,
         }),
+      onError: () => toast.error("Não foi possível salvar o entregador."),
     });
-    setFolha(null);
   }
 
   function excluirCadastro(d: Entregador) {
+    setFolha(null);
     removerE.mutate(d.id, {
       onSuccess: () => toast.success("Entregador removido", { description: d.nome }),
+      onError: () => toast.error("Não foi possível excluir o entregador."),
     });
-    setFolha(null);
+  }
+
+  function abrirNovoEntregador() {
+    vibrar(8);
+    setFolha({ dados: { id: uid("ent"), nome: "", telefone: "", ativo: true }, novo: true });
   }
 
   function selecionarAba(valor: string) {
@@ -218,21 +222,110 @@ export function TelaEntregas() {
         </div>
       </Cartao>
 
+      {/* ------------------------------------------------- entregadores */}
+      <div className="flex flex-col gap-2.5">
+        <TituloSecao
+          acao={
+            <Botao variante="dourado" tamanho="sm" className="h-9 gap-1 px-3 text-[12.5px]" onClick={abrirNovoEntregador}>
+              <Plus size={15} strokeWidth={2.6} /> Novo entregador
+            </Botao>
+          }
+        >
+          <span className="flex items-center gap-2">
+            <Users size={18} className="text-brand" /> Entregadores ({entregadores.length})
+          </span>
+        </TituloSecao>
+
+        {entQ.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Esqueleto className="h-14 rounded-[18px]" />
+          </div>
+        ) : entregadores.length === 0 ? (
+          <Cartao className="flex items-center justify-between gap-3 p-3.5">
+            <div className="min-w-0">
+              <p className="text-[14px] font-bold text-tinta">Nenhum entregador cadastrado</p>
+              <p className="text-[12px] text-tinta-3">Cadastre seus entregadores para atribuir as entregas.</p>
+            </div>
+            <Botao variante="primario" tamanho="sm" className="shrink-0" onClick={abrirNovoEntregador}>
+              <Plus size={15} /> Cadastrar
+            </Botao>
+          </Cartao>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {entregadores.map((e) => (
+              <li key={e.id}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setFolha({ dados: { ...e }, novo: false })}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      setFolha({ dados: { ...e }, novo: false });
+                    }
+                  }}
+                  className={cn(
+                    "card flex items-center gap-3 p-3 transition-transform active:scale-[0.99]",
+                    !e.ativo && "opacity-60",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-10 shrink-0 place-items-center rounded-full font-display text-base font-semibold",
+                      e.ativo ? "bg-brand text-crema" : "bg-neutro text-neutro-ink",
+                    )}
+                  >
+                    {iniciais(e.nome)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate font-semibold text-tinta">{e.nome}</p>
+                      {!e.ativo && (
+                        <Chip className="shrink-0 border-neutro bg-neutro/70 px-1.5 py-0 text-[10px] text-neutro-ink">
+                          Inativo
+                        </Chip>
+                      )}
+                    </div>
+                    {e.telefone ? (
+                      <a
+                        href={telHref(e.telefone)}
+                        onClick={(ev) => ev.stopPropagation()}
+                        className="mt-0.5 flex w-fit items-center gap-1 truncate text-[12.5px] font-medium text-brand active:underline"
+                      >
+                        <Phone size={12} /> {e.telefone}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-[12px] text-tinta-3">Toque para editar</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <NumeroAnimado
+                      valor={entreguesPor[e.id] ?? 0}
+                      className="text-lg font-bold text-entregue"
+                    />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-tinta-3">entregues</p>
+                  </div>
+                  <ChevronRight size={18} className="shrink-0 text-tinta-3" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* ------------------------------------------------------------ abas */}
       <div>
         <div className="flex gap-2 overflow-x-auto pb-1.5">
           <Aba nome="Todos" selecionada={aba === "todos" && !soSem} onClick={() => selecionarAba("todos")} />
-          <AnimatePresence initial={false}>
-            {ativos.map((e) => (
-              <Aba
-                key={e.id}
-                nome={e.nome}
-                badge={porEntregador[e.id] ?? 0}
-                selecionada={!soSem && aba === e.id}
-                onClick={() => selecionarAba(e.id)}
-              />
-            ))}
-          </AnimatePresence>
+          {ativos.map((e) => (
+            <Aba
+              key={e.id}
+              nome={e.nome}
+              badge={porEntregador[e.id] ?? 0}
+              selecionada={!soSem && aba === e.id}
+              onClick={() => selecionarAba(e.id)}
+            />
+          ))}
         </div>
         <div className="flex items-center gap-2 pt-1">
           <Botao
@@ -276,7 +369,7 @@ export function TelaEntregas() {
           <Vazio
             icone={<PackageOpen size={28} />}
             titulo="Sem entregas hoje"
-            descricao="As marmitas do dia aparecem aqui conforme forem lançadas na tela do dia."
+            descricao="Os pedidos do dia aparecem aqui."
           />
         </Cartao>
       ) : lista.length === 0 ? (
@@ -284,7 +377,7 @@ export function TelaEntregas() {
           <Vazio
             icone={<Bike size={28} />}
             titulo="Nada nesta seleção"
-            descricao="Nenhuma marmita corresponde ao filtro atual."
+            descricao="Nenhuma marmita neste filtro."
             acao={
               <Botao
                 variante="neutro"
@@ -301,7 +394,7 @@ export function TelaEntregas() {
         </Cartao>
       ) : (
         <ul className="flex flex-col gap-2.5">
-          <AnimatePresence initial={false} mode="popLayout">
+          <AnimatePresence initial={false}>
             {lista.map((v) => {
               const nome = v.entreguePor ? mapaNome[v.entreguePor] : undefined;
               const done = v.status === "entregue";
@@ -309,7 +402,6 @@ export function TelaEntregas() {
               return (
                 <motion.li
                   key={v.id}
-                  layout
                   initial={{ opacity: 0, y: 10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, x: -24, transition: { duration: 0.18 } }}
@@ -385,114 +477,6 @@ export function TelaEntregas() {
         </ul>
       )}
 
-      {/* ------------------------------------------------- entregadores */}
-      <div className="mt-2 flex flex-col gap-2.5">
-        <TituloSecao>
-          <span className="flex items-center gap-2">
-            <Users size={18} className="text-brand" /> Entregadores cadastrados
-          </span>
-        </TituloSecao>
-
-        {entQ.isPending ? (
-          <div className="flex flex-col gap-2.5">
-            <Esqueleto className="h-16 rounded-[18px]" />
-            <Esqueleto className="h-16 rounded-[18px]" />
-          </div>
-        ) : entregadores.length === 0 ? (
-          <Cartao className="p-1">
-            <Vazio
-              icone={<Users size={28} />}
-              titulo="Nenhum entregador"
-              descricao="Cadastre quem faz as entregas para atribuir as marmitas com um toque."
-              acao={
-                <Botao
-                  variante="dourado"
-                  tamanho="sm"
-                  onClick={() => setFolha({ dados: { id: uid("ent"), nome: "", telefone: "", ativo: true }, novo: true })}
-                >
-                  <Plus size={15} /> Novo entregador
-                </Botao>
-              }
-            />
-          </Cartao>
-        ) : (
-          <motion.ul variants={{ oculto: {}, visivel: { transition: { staggerChildren: 0.04 } } }} initial="oculto" animate="visivel" className="flex flex-col gap-2.5">
-            {entregadores.map((e) => (
-              <motion.li key={e.id} variants={{ oculto: { opacity: 0, y: 8 }, visivel: { opacity: 1, y: 0, transition: MOLINHO } }}>
-                <motion.div
-                  role="button"
-                  tabIndex={0}
-                  whileTap={apertar}
-                  onClick={() => setFolha({ dados: { ...e }, novo: false })}
-                  onKeyDown={(ev) => {
-                    if (ev.key === "Enter" || ev.key === " ") {
-                      ev.preventDefault();
-                      setFolha({ dados: { ...e }, novo: false });
-                    }
-                  }}
-                  className={cn(
-                    "card flex items-center gap-3 p-3",
-                    !e.ativo && "opacity-60",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid size-11 shrink-0 place-items-center rounded-full font-display text-lg font-semibold",
-                      e.ativo ? "bg-brand text-crema" : "bg-neutro text-neutro-ink",
-                    )}
-                  >
-                    {iniciais(e.nome)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate font-semibold text-tinta">{e.nome}</p>
-                      {!e.ativo && (
-                        <Chip className="shrink-0 border-neutro bg-neutro/70 px-1.5 py-0 text-[10px] text-neutro-ink">
-                          Inativo
-                        </Chip>
-                      )}
-                    </div>
-                    {e.telefone ? (
-                      <a
-                        href={telHref(e.telefone)}
-                        onClick={(ev) => ev.stopPropagation()}
-                        className="mt-0.5 flex w-fit items-center gap-1 truncate text-[13px] font-medium text-brand active:underline"
-                      >
-                        <Phone size={12} /> {e.telefone}
-                      </a>
-                    ) : (
-                      <p className="mt-0.5 text-[13px] text-tinta-3">Sem telefone</p>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <NumeroAnimado
-                      valor={entreguesPor[e.id] ?? 0}
-                      className="text-xl font-bold text-entregue"
-                    />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-tinta-3">entregues</p>
-                  </div>
-                  <ChevronRight size={18} className="shrink-0 text-tinta-3" />
-                </motion.div>
-              </motion.li>
-            ))}
-          </motion.ul>
-        )}
-      </div>
-
-      {/* botão flutuante para cadastrar entregador */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+var(--safe-bottom))] z-20">
-        <div className="mx-auto flex max-w-[560px] justify-end px-4">
-          <Botao
-            variante="dourado"
-            tamanho="lg"
-            className="pointer-events-auto shadow-elevado"
-            onClick={() => setFolha({ dados: { id: uid("ent"), nome: "", telefone: "", ativo: true }, novo: true })}
-          >
-            <Plus size={18} strokeWidth={2.6} /> Entregador
-          </Botao>
-        </div>
-      </div>
-
       {editando && (
         <EditorVenda
           key={editando.id}
@@ -502,6 +486,10 @@ export function TelaEntregas() {
           salvando={salvar.isPending}
           aoFechar={() => setEditando(null)}
           aoSalvar={salvarEdicao}
+          aoNovoEntregador={() => {
+            setEditando(null);
+            abrirNovoEntregador();
+          }}
         />
       )}
 
@@ -583,6 +571,7 @@ function EditorVenda({
   salvando,
   aoFechar,
   aoSalvar,
+  aoNovoEntregador,
 }: {
   venda: Venda;
   entregadores: Entregador[];
@@ -590,6 +579,7 @@ function EditorVenda({
   salvando: boolean;
   aoFechar: () => void;
   aoSalvar: (v: Venda) => void;
+  aoNovoEntregador: () => void;
 }) {
   const [por, setPor] = useState<string | null>(venda.entreguePor);
   const [status, setStatus] = useState<StatusVenda>(statusInicial ?? venda.status);
@@ -620,7 +610,16 @@ function EditorVenda({
         {APARENCIA[status].rotulo}
       </p>
 
-      <p className="pb-2 text-[13px] font-semibold uppercase tracking-wide text-tinta-3">Quem entrega</p>
+      <div className="flex items-center justify-between pb-2">
+        <p className="text-[13px] font-semibold uppercase tracking-wide text-tinta-3">Quem entrega</p>
+        <button
+          type="button"
+          onClick={aoNovoEntregador}
+          className="inline-flex items-center gap-1 rounded-full bg-gold-soft px-2.5 py-1 text-[12px] font-bold text-preparada-ink active:scale-95"
+        >
+          <Plus size={14} strokeWidth={2.5} /> Novo entregador
+        </button>
+      </div>
       <div className="flex flex-col gap-2">
         <LinhaOpcao
           rotulo="Sem entregador"
@@ -822,36 +821,32 @@ function EditorEntregador({
         <div className="flex flex-col gap-1.5">
           <span className="pl-1 text-[13px] font-semibold text-tinta-2">Situação</span>
           <div className="flex gap-2">
-            <Botao
-              variante="neutro"
-              tamanho="md"
-              className={cn("relative flex-1", ativo ? "text-crema" : "text-tinta-2")}
+            <button
+              type="button"
+              className={cn(
+                "flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 text-[13.5px] font-bold transition-colors",
+                ativo ? "border-paga bg-paga text-white" : "border-line bg-white text-tinta-2",
+              )}
               onClick={() => {
                 vibrar();
                 setAtivo(true);
               }}
             >
-              {ativo && (
-                <motion.span layoutId="cad-ativo" transition={MOLINHO} className="absolute inset-0 rounded-2xl bg-entregue" />
+              <Check size={15} strokeWidth={2.6} /> Ativo
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 text-[13.5px] font-bold transition-colors",
+                !ativo ? "border-cancelada bg-cancelada text-white" : "border-line bg-white text-tinta-2",
               )}
-              <span className="relative z-10 flex items-center justify-center gap-1.5">
-                <Check size={15} strokeWidth={2.6} /> Ativo
-              </span>
-            </Botao>
-            <Botao
-              variante="neutro"
-              tamanho="md"
-              className={cn("relative flex-1", !ativo ? "text-crema" : "text-tinta-2")}
               onClick={() => {
                 vibrar();
                 setAtivo(false);
               }}
             >
-              {!ativo && (
-                <motion.span layoutId="cad-ativo" transition={MOLINHO} className="absolute inset-0 rounded-2xl bg-cancelada" />
-              )}
-              <span className="relative z-10">Inativo</span>
-            </Botao>
+              Inativo
+            </button>
           </div>
         </div>
 

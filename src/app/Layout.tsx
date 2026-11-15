@@ -7,7 +7,6 @@ import {
   ChartColumnBig,
   ChefHat,
   ClipboardList,
-  KeyRound,
   MonitorPlay,
   MoreHorizontal,
   Receipt,
@@ -38,13 +37,12 @@ export const ITENS_NAV: ItemNav[] = [
   { para: "/agenda", rotulo: "Agenda", icone: CalendarDays },
 ];
 
-const ROTAS_SECUNDARIAS = ["/ajustes", "/cozinha", "/entregas", "/vendas", "/usuarios"];
+const ROTAS_SECUNDARIAS = ["/ajustes", "/cozinha", "/entregas", "/vendas"];
 
 const ATALHOS_RAPIDOS = [
   { para: "/cozinha", rotulo: "Cozinha", icone: ChefHat },
   { para: "/entregas", rotulo: "Entregas", icone: Bike },
   { para: "/vendas", rotulo: "Vendas", icone: TrendingUp },
-  { para: "/usuarios", rotulo: "Acessos", icone: KeyRound },
   { para: "/ajustes", rotulo: "Opções", icone: MoreHorizontal },
 ] as const;
 
@@ -88,14 +86,13 @@ export function Layout({ children, extras }: { children: ReactNode; extras?: Rea
   const emRotaSecundaria = ROTAS_SECUNDARIAS.some((r) => pathname.startsWith(r));
 
   return (
-    <div className="fundo-quente relative flex min-h-dvh flex-col bg-crema">
-      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[var(--safe-top)] bg-brand" />
-      <header className="sticky top-0 z-30 bg-brand text-crema shadow-[0_12px_30px_-14px_rgba(53,7,10,0.55)]">
-        <div className="mx-auto flex w-full max-w-[600px] items-center justify-between gap-2.5 px-4 pb-3.5 pt-[calc(0.8rem+var(--safe-top))]">
+    <div className="fundo-quente relative flex h-dvh flex-col overflow-hidden bg-crema">
+      <header className="z-30 shrink-0 select-none border-b border-brand-ink bg-brand text-crema touch-manipulation">
+        <div className="mx-auto flex w-full max-w-[600px] items-center justify-between gap-2.5 px-4 pb-3 pt-[calc(0.65rem+var(--safe-top))]">
           <Link
             to="/dia"
             onClick={() => vibrar(6)}
-            className="flex shrink-0 items-center rounded-xl py-0.5 pr-1 transition-transform active:scale-96"
+            className="flex shrink-0 items-center rounded-xl py-0.5 pr-1"
             aria-label="Ir para o fluxo do dia"
           >
             <Marca compacta />
@@ -103,15 +100,13 @@ export function Layout({ children, extras }: { children: ReactNode; extras?: Rea
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             {!online && (
-              <motion.span
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
+              <span
                 className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/20 px-2 py-1 text-[10.5px] font-bold text-gold-300"
                 title="Sem internet — salvando no celular"
               >
                 <WifiOff size={12} />
                 <span className="hidden min-[360px]:inline">Offline</span>
-              </motion.span>
+              </span>
             )}
 
             <AtalhoTopo
@@ -135,7 +130,6 @@ export function Layout({ children, extras }: { children: ReactNode; extras?: Rea
             <DataHoje />
           </div>
         </div>
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-gold/65 to-transparent" />
 
         <AnimatePresence initial={false}>
           {emRotaSecundaria && (
@@ -191,21 +185,23 @@ export function Layout({ children, extras }: { children: ReactNode; extras?: Rea
         </AnimatePresence>
       </header>
 
-      <main className="mx-auto w-full max-w-[600px] flex-1 px-3 pb-[calc(5.75rem+var(--safe-bottom))] pt-3 sm:px-4">
-        {reduzido ? (
-          children
-        ) : (
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={pathname} variants={rota} initial="oculto" animate="visivel" exit="saindo">
-              {children}
-            </motion.div>
-          </AnimatePresence>
-        )}
+      <main className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-[600px] px-3 pb-6 pt-3 sm:px-4">
+          {reduzido ? (
+            children
+          ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={pathname} variants={rota} initial="oculto" animate="visivel" exit="saindo">
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </div>
       </main>
 
       <nav
         aria-label="Navegação principal"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line/90 bg-white/95 shadow-[0_-10px_30px_-15px_rgba(82,16,17,0.18)] backdrop-blur-xl"
+        className="z-30 shrink-0 select-none border-t border-line bg-white shadow-[0_-8px_24px_-14px_rgba(82,16,17,0.16)] touch-manipulation"
       >
         <div className="mx-auto grid w-full max-w-[600px] grid-cols-6 items-stretch gap-0.5 px-1.5 pb-[calc(0.25rem+var(--safe-bottom))] pt-1">
           {ITENS_NAV.map((item) => (
@@ -258,7 +254,7 @@ function AtalhoTopo({
         onClick={() => vibrar(6)}
         aria-label={`${rotulo}${badge > 0 ? ` (${badge})` : ""}`}
         className={cn(
-          "relative flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-bold transition-all active:scale-95",
+          "relative flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-bold transition-colors",
           ativo
             ? "border-gold bg-gold text-brand-ink shadow-suave"
             : "border-crema/20 bg-crema/10 text-crema hover:bg-crema/15",
@@ -267,18 +263,14 @@ function AtalhoTopo({
         <Icone size={15} strokeWidth={2.3} />
         <span className="hidden min-[420px]:inline">{rotulo}</span>
         {badge > 0 && (
-          <motion.span
-            key={badge}
-            initial={{ scale: 0.6 }}
-            animate={{ scale: 1 }}
-            transition={MOLINHO}
+          <span
             className={cn(
               "num grid min-w-[19px] place-items-center rounded-full px-1.5 py-0.5 text-[10.5px] font-extrabold leading-none",
               ativo ? "bg-brand text-crema" : corBadge,
             )}
           >
             {badge}
-          </motion.span>
+          </span>
         )}
       </NavLink>
   );

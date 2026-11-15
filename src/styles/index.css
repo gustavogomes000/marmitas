@@ -114,11 +114,13 @@
 }
 
 html,
-body {
-  height: 100%;
-  overflow-x: clip;
+body,
+#root {
+  height: 100dvh;
+  overflow: hidden;
   background-color: var(--color-brand);
-  color-scheme: dark;
+  color-scheme: light;
+  touch-action: manipulation;
 }
 
 body {
@@ -127,7 +129,7 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
 }
 
 .fundo-quente {
@@ -137,15 +139,6 @@ body {
 /* Garante que popups/toasts no topo nunca fiquem cortados pela ilha/notch ou cabeçalho */
 [data-sonner-toaster][data-y-position="top"] {
   top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
-}
-
-/* Fundo com o "vapor" quente da cozinha apenas na metade inferior, sem clarear o topo. */
-.fundo-quente::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(90% 50% at 100% 100%, rgb(82 16 17 / 0.06), transparent 70%);
 }
 
 .num {

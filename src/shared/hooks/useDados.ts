@@ -183,7 +183,23 @@ export function useSalvarEntregador() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (e: Entregador) => repo.salvarEntregador(e),
-    onSuccess: () => qc.invalidateQueries({ queryKey: chaves.entregadores }),
+    onMutate: async (novo) => {
+      await qc.cancelQueries({ queryKey: chaves.entregadores });
+      const anterior = qc.getQueryData<Entregador[]>(chaves.entregadores);
+      const listaAtual = anterior ?? [];
+      const existe = listaAtual.some((item) => item.id === novo.id);
+      const proxima = existe
+        ? listaAtual.map((item) => (item.id === novo.id ? novo : item))
+        : [...listaAtual, novo];
+      qc.setQueryData<Entregador[]>(chaves.entregadores, proxima);
+      return { anterior };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.anterior) qc.setQueryData(chaves.entregadores, ctx.anterior);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: chaves.entregadores });
+    },
   });
 }
 
@@ -191,7 +207,24 @@ export function useRemoverEntregador() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => repo.removerEntregador(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: chaves.entregadores }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: chaves.entregadores });
+      const anterior = qc.getQueryData<Entregador[]>(chaves.entregadores);
+      if (anterior) {
+        qc.setQueryData<Entregador[]>(
+          chaves.entregadores,
+          anterior.filter((item) => item.id !== id),
+        );
+      }
+      return { anterior };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.anterior) qc.setQueryData(chaves.entregadores, ctx.anterior);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: chaves.entregadores });
+      void qc.invalidateQueries({ queryKey: ["dia"] });
+    },
   });
 }
 

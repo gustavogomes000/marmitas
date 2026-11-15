@@ -12,7 +12,7 @@ import {
   calcularTotais, dividirVenda, faltaReceber, idMovimentacaoPagamento, linhaExtra, precoUnitario,
   valorLinha, valorRecebido,
 } from "@/domain/totais";
-import { APARENCIA, ENTREGUE, PAGA, PREPARADA, estaMontada } from "@/shared/lib/status";
+import { APARENCIA, ENTREGUE, PAGA, PREPARADA } from "@/shared/lib/status";
 import {
   AreaTexto, Barra, BarraProgresso, Botao, Campo, Cartao, Chip, NumeroAnimado, Sheet, TituloSecao, Vazio,
 } from "@/shared/components/ui";
@@ -24,7 +24,7 @@ import { uid } from "@/shared/lib/storage";
 import { useReduzirMovimento, vibrar } from "@/shared/hooks/useAnimacao";
 import {
   useCategorias, useDia, useDias, useEntregadores, useMovimentacaoRapida, useMovimentacoes,
-  useRemoverVenda, useSalvarDia, useSalvarVendas, useVendasEmAberto,
+  useRemoverEntregador, useRemoverVenda, useSalvarDia, useSalvarEntregador, useSalvarVendas, useVendasEmAberto,
 } from "@/shared/hooks/useDados";
 import { cn } from "@/shared/lib/cn";
 
@@ -72,13 +72,15 @@ export function TelaDia() {
   const caixa = useMovimentacaoRapida();
   const categorias = useCategorias();
   const entregadores = useEntregadores();
+  const salvarEntregador = useSalvarEntregador();
+  const removerEntregador = useRemoverEntregador();
   const vendasEmAbertoQuery = useVendasEmAberto(hoje);
 
   const [colagemAberta, setColagemAberta] = useState(false);
   const [avulsoAberto, setAvulsoAberto] = useState(false);
   const [cobrancasAberta, setCobrancasAberta] = useState(false);
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<"todos" | "receber" | "montar" | "entregar">("todos");
+  const [filtro, setFiltro] = useState<"todos" | "montar" | "prontas" | "entregues" | "receber" | "pagas">("todos");
   const [pagando, setPagando] = useState<Venda | null>(null);
   const [detalhe, setDetalhe] = useState<Venda | null>(null);
   const [dividindo, setDividindo] = useState<Venda | null>(null);
@@ -91,8 +93,22 @@ export function TelaDia() {
   const preco = cabecalho.precoMarmita;
   const totais = resumo?.totais ?? calcularTotais([], 0);
   const categoriaVenda = (categorias.data ?? []).find((c) => c.fluxo === "entrada");
-  const emAberto = useMemo(() => vendas.filter((v) => faltaReceber(v, preco) > 0), [vendas, preco]);
+  const emAberto = useMemo(
+    () => vendas.filter((v) => v.status !== "cancelada" && faltaReceber(v, preco) > 0),
+    [vendas, preco],
+  );
+  const pagasLista = useMemo(
+    () => vendas.filter((v) => v.status !== "cancelada" && v.paga && faltaReceber(v, preco) <= 0),
+    [vendas, preco],
+  );
+  const faltamPrepararQtd = useMemo(() => vendas.filter((v) => v.status === "pendente").length, [vendas]);
+  const prontasQtd = useMemo(() => vendas.filter((v) => v.status === "preparada").length, [vendas]);
+  const entreguesQtd = useMemo(() => vendas.filter((v) => v.status === "entregue").length, [vendas]);
   const todasEmAberto = vendasEmAbertoQuery.data ?? [];
+  const totalEmAbertoGeral = useMemo(
+    () => todasEmAberto.reduce((s, item) => s + item.valor, 0),
+    [todasEmAberto],
+  );
 
   const movimentosDia = useMovimentacoes(data, data);
   const gastos = useMemo(
@@ -115,9 +131,18 @@ export function TelaDia() {
     let lista = vendas;
     if (termo) lista = lista.filter((v) => normalizar(v.cliente).includes(termo));
     if (filtro === "montar") lista = lista.filter((v) => v.status === "pendente");
-    if (filtro === "entregar") lista = lista.filter((v) => estaMontada(v.status) && v.status !== "entregue");
-    if (filtro === "receber") lista = lista.filter((v) => faltaReceber(v, preco) > 0);
-    return lista;
+    if (filtro === "prontas") lista = lista.filter((v) => v.status === "preparada");
+    if (filtro === "entregues") lista = lista.filter((v) => v.status === "entregue");
+    if (filtro === "receber") lista = lista.filter((v) => v.status !== "cancelada" && faltaReceber(v, preco) > 0);
+    if (filtro === "pagas") lista = lista.filter((v) => v.status !== "cancelada" && v.paga && faltaReceber(v, preco) <= 0);
+    return [...lista].sort((a, b) => {
+      const grupo = (v: Venda) => {
+        if (v.status === "cancelada") return 2;
+        if (v.paga && faltaReceber(v, preco) <= 0) return 1;
+        return 0;
+      };
+      return grupo(a) - grupo(b) || a.ordem - b.ordem;
+    });
   }, [vendas, busca, filtro, preco]);
 
   const aplicar = (lista: Venda[]) => salvarVendas.mutate(lista);
@@ -430,24 +455,34 @@ export function TelaDia() {
           </Botao>
         </div>
 
-        <Botao
-          variante="dourado"
-          tamanho="sm"
-          larguraTotal
-          className="h-10 text-[13px]"
+        <button
+          type="button"
           onClick={() => {
             vibrar(8);
             setCobrancasAberta(true);
           }}
+          className="flex w-full items-center justify-between gap-2.5 rounded-2xl border border-gold-300 bg-gradient-to-r from-gold-soft via-gold-soft/80 to-white px-3.5 py-2.5 text-left shadow-suave transition-colors active:bg-gold-soft"
         >
-          <CircleDollarSign size={16} />
-          Filtrar não pagos por dia (Cobranças)
-          {todasEmAberto.length > 0 && (
-            <span className="num ml-1 rounded-full bg-brand px-2 py-0.5 text-[11px] font-extrabold text-crema">
-              {todasEmAberto.length}
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gold text-brand-ink shadow-sm">
+              <CircleDollarSign size={18} strokeWidth={2.3} />
             </span>
-          )}
-        </Botao>
+            <span className="min-w-0">
+              <span className="block truncate text-[13.5px] font-bold text-brand">
+                Quem não pagou · Cobranças
+              </span>
+              <span className="block truncate text-[11.5px] font-semibold text-preparada-ink">
+                {todasEmAberto.length === 0
+                  ? "Tudo pago em todos os dias"
+                  : `${todasEmAberto.length} pendente${todasEmAberto.length > 1 ? "s" : ""} · ${moeda(totalEmAbertoGeral)}`}
+              </span>
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-crema">
+            {todasEmAberto.length > 0 ? `Ver (${todasEmAberto.length})` : "Abrir"}
+            <ChevronRight size={13} />
+          </span>
+        </button>
       </Cartao>
 
       <Cartao className="flex flex-col gap-2 p-3">
@@ -460,9 +495,8 @@ export function TelaDia() {
         </div>
 
         {gastos.length === 0 ? (
-          <p className="px-1 text-[12.5px] text-tinta-3">
-            Nada lançado como gasto em {dataCurta(data)}. Comprou arroz, gás ou carne para a semana? Lance aqui para
-            saber quanto sobrou do dia.
+          <p className="px-1 text-[12px] text-tinta-3">
+            Nenhum gasto lançado em {dataCurta(data)}.
           </p>
         ) : (
           <ul className="flex flex-col">
@@ -518,37 +552,30 @@ export function TelaDia() {
             }
           />
           <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {(["todos", "receber", "montar", "entregar"] as const).map((f) => {
+            {(["todos", "montar", "prontas", "entregues", "receber", "pagas"] as const).map((f) => {
               const ativo = filtro === f;
               return (
-                <motion.button
+                <button
                   key={f}
                   type="button"
-                  whileTap={{ scale: 0.96 }}
-                  transition={MOLINHO}
                   onClick={() => {
                     vibrar(6);
                     setFiltro(f);
                   }}
                   className={cn(
-                    "relative shrink-0 overflow-hidden rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition-colors",
-                    ativo ? "border-brand text-crema" : "border-line bg-white/85 text-tinta-2",
+                    "relative shrink-0 overflow-hidden rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                    ativo ? "border-brand bg-brand text-crema" : "border-line bg-white text-tinta-2",
                   )}
                 >
-                  {ativo && (
-                    <motion.span
-                      layoutId="filtro-dia-ativo"
-                      transition={MOLINHO}
-                      className="absolute inset-0 bg-brand"
-                    />
-                  )}
                   <span className="relative z-10">
                     {f === "todos" && `Todos (${vendas.length})`}
+                    {f === "montar" && `Faltam preparar (${faltamPrepararQtd})`}
+                    {f === "prontas" && `Prontas (${prontasQtd})`}
+                    {f === "entregues" && `Entregues (${entreguesQtd})`}
                     {f === "receber" && `Não pagaram (${emAberto.length})`}
-                    {f === "montar" && `Faltam montar (${totais.pendentes})`}
-                    {f === "entregar" && "Prontas p/ entregar"}
+                    {f === "pagas" && `Pagas (${pagasLista.length})`}
                   </span>
-                </motion.button>
+                </button>
               );
             })}
           </div>
@@ -579,7 +606,7 @@ export function TelaDia() {
         <Vazio
           icone={<ClipboardPaste size={26} />}
           titulo={`${rotuloRelativo(data)} sem pedidos`}
-          descricao="Cole a mensagem do grupo: eu leio nome por nome, somo as quantidades e comparo com o que já existe."
+          descricao="Cole a lista do grupo ou lance um pedido avulso."
           acao={
             <Botao variante="dourado" onClick={() => setColagemAberta(true)}>
               Colar mensagem
@@ -683,6 +710,26 @@ export function TelaDia() {
             atuais={(entregadores.data ?? []).filter((e) => e.ativo)}
             selecionado={escolhendoEntregador.entreguePor}
             aoEscolher={(id) => escolherEntregador(escolhendoEntregador, id)}
+            aoCriar={(nome, telefone) => {
+              const id = uid("ent");
+              salvarEntregador.mutate(
+                { id, nome, telefone, ativo: true },
+                {
+                  onSuccess: () => {
+                    toast.success(`Entregador ${nome} cadastrado!`);
+                  },
+                },
+              );
+              escolherEntregador(escolhendoEntregador, id);
+            }}
+            aoRemover={(id, nome) => {
+              removerEntregador.mutate(id, {
+                onSuccess: () => toast.success(`Entregador ${nome} removido`),
+              });
+              if (escolhendoEntregador.entreguePor === id) {
+                escolherEntregador(escolhendoEntregador, null);
+              }
+            }}
           />
         )}
       </Sheet>
@@ -985,24 +1032,24 @@ function BotaoStatus({
 }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.93 }}
+      whileTap={{ scale: 0.94 }}
       transition={MOLINHO}
       onClick={onClick}
       aria-pressed={ativo}
       className={cn(
-        "flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 text-[12.5px] font-bold transition-colors",
+        "flex h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl border-2 px-1.5 text-[11.5px] font-bold transition-colors sm:text-[12.5px]",
         ativo ? cor.solido : cor.inativo,
       )}
     >
-      <motion.span
-        initial={false}
-        animate={{ scale: ativo ? 1 : 0.4, opacity: ativo ? 1 : 0.35 }}
-        transition={MOLINHO}
-        className="grid size-4 shrink-0 place-items-center rounded-full border-2 border-current"
+      <span
+        className={cn(
+          "grid size-3.5 shrink-0 place-items-center rounded-full border-[1.75px] border-current transition-opacity",
+          ativo ? "opacity-100" : "opacity-45",
+        )}
       >
-        {ativo && <Check size={11} strokeWidth={3.5} />}
-      </motion.span>
-      {rotulo}
+        {ativo && <Check size={9.5} strokeWidth={3.5} />}
+      </span>
+      <span className="truncate leading-none">{rotulo}</span>
     </motion.button>
   );
 }
@@ -1042,6 +1089,10 @@ function LinhaPedido({
   const aparenciaCard = quitada ? PAGA.card : cor.card;
   const corFlash = quitada ? PAGA.cheio : cor.cheio;
 
+  const etapaPreparada = venda.status === "preparada" || venda.status === "entregue";
+  const etapaEntregue = venda.status === "entregue";
+  const etapaPaga = quitada;
+
   useEffect(() => {
     if (venda.status !== anterior.current || venda.paga !== anteriorPaga.current) {
       anterior.current = venda.status;
@@ -1054,19 +1105,13 @@ function LinhaPedido({
     <motion.li
       variants={itemLista}
       exit="saindo"
-      layout
-      transition={MOLINHO}
       className={cn(
         "card relative overflow-hidden py-2.5 pl-4 pr-2.5 transition-colors duration-300",
         aparenciaCard,
         quitada && "shadow-[0_10px_26px_-14px_rgba(21,128,61,0.35)]",
       )}
     >
-      <motion.span
-        layout
-        transition={MOLINHO}
-        className={cn("absolute inset-y-0 left-0 w-2", quitada ? PAGA.barra : cor.barra)}
-      />
+      <span className={cn("absolute inset-y-0 left-0 w-2", quitada ? PAGA.barra : cor.barra)} />
 
       {/* flash de confirmação: o card inteiro pisca na cor do status novo */}
       <AnimatePresence>
@@ -1085,17 +1130,21 @@ function LinhaPedido({
 
       <div className="relative flex items-center gap-2">
         <button onClick={aoAbrirDetalhe} className="min-w-0 flex-1 text-left">
-          <span className="flex items-center gap-2">
-            <span className="truncate text-[17px] font-bold text-tinta">{nomeParaExibir(venda.cliente)}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[16.5px] font-bold text-tinta">{nomeParaExibir(venda.cliente)}</span>
             {venda.status === "cancelada" && (
               <Chip className="shrink-0 border-cancelada/30 bg-white text-cancelada-ink">cancelada</Chip>
             )}
             {venda.pg && falta > 0 && <Chip className="shrink-0 border-gold-300 bg-white text-preparada-ink">PG</Chip>}
-            {venda.paga && <Chip className="shrink-0 border-paga/30 bg-white text-paga-ink">paga</Chip>}
+            {etapaPaga && (
+              <Chip className="shrink-0 border-paga/40 bg-paga text-white">
+                <Check size={10} strokeWidth={3} /> Paga
+              </Chip>
+            )}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-[11px] text-tinta-3">
             {total > 0 && (
-              <span className={cn("num font-semibold", venda.paga && falta <= 0 ? "text-paga-ink" : "text-tinta-2")}>
+              <span className={cn("num font-semibold", etapaPaga ? "text-paga-ink" : "text-tinta-2")}>
                 {moeda(total)}
               </span>
             )}
@@ -1120,10 +1169,55 @@ function LinhaPedido({
         </button>
       </div>
 
-      <div className="relative mt-2 flex items-stretch gap-1.5">
-        <BotaoStatus rotulo="Preparada" ativo={venda.status === "preparada"} cor={PREPARADA} onClick={aoPreparar} />
-        <BotaoStatus rotulo="Entregue" ativo={venda.status === "entregue"} cor={ENTREGUE} onClick={aoEntregar} />
-        <BotaoStatus rotulo="Paga" ativo={venda.paga && falta <= 0} cor={PAGA} onClick={aoPagar} />
+      {venda.status !== "cancelada" && (
+        <div className="relative mt-2 flex items-center gap-1.5 px-0.5">
+          <span
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-colors",
+              etapaPreparada ? "bg-preparada" : "bg-line",
+            )}
+          />
+          <span
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-colors",
+              etapaEntregue ? "bg-entregue" : "bg-line",
+            )}
+          />
+          <span
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-colors",
+              etapaPaga ? "bg-paga" : "bg-line",
+            )}
+          />
+          <span
+            className={cn(
+              "ml-1 shrink-0 text-[10px] font-extrabold uppercase tracking-wider",
+              etapaPaga
+                ? "text-paga-ink"
+                : etapaEntregue
+                  ? "text-entregue-ink"
+                  : etapaPreparada
+                    ? "text-preparada-ink"
+                    : "text-tinta-3",
+            )}
+          >
+            {etapaPaga && etapaEntregue
+              ? "Concluído"
+              : etapaPaga
+                ? "Pago"
+                : etapaEntregue
+                  ? "2/3 Entregue"
+                  : etapaPreparada
+                    ? "1/3 Pronta"
+                    : "Na fila"}
+          </span>
+        </div>
+      )}
+
+      <div className="relative mt-1.5 flex items-stretch gap-1.5">
+        <BotaoStatus rotulo="Preparada" ativo={etapaPreparada} cor={PREPARADA} onClick={aoPreparar} />
+        <BotaoStatus rotulo="Entregue" ativo={etapaEntregue} cor={ENTREGUE} onClick={aoEntregar} />
+        <BotaoStatus rotulo="Paga" ativo={etapaPaga} cor={PAGA} onClick={aoPagar} />
       </div>
 
       <div className="relative mt-1.5 flex min-w-0 items-center gap-3">
@@ -1375,33 +1469,102 @@ function EscolhaEntregador({
   atuais,
   selecionado,
   aoEscolher,
+  aoCriar,
+  aoRemover,
 }: {
   atuais: { id: string; nome: string; telefone: string }[];
   selecionado: string | null;
   aoEscolher: (id: string | null) => void;
+  aoCriar: (nome: string, telefone: string) => void;
+  aoRemover: (id: string, nome: string) => void;
 }) {
+  const [criando, setCriando] = useState(atuais.length === 0);
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+
+  function cadastrar() {
+    if (!nome.trim()) {
+      toast("Digite o nome do entregador");
+      return;
+    }
+    aoCriar(nome.trim(), telefone.trim());
+    setNome("");
+    setTelefone("");
+    setCriando(false);
+  }
+
   return (
-    <div className="flex flex-col gap-2 pb-2">
-      {atuais.length === 0 && <p className="py-6 text-center text-sm text-tinta-3">Nenhum entregador cadastrado ainda.</p>}
-      {atuais.map((e) => (
-        <button
-          key={e.id}
-          onClick={() => aoEscolher(e.id)}
-          className={cn(
-            "card flex items-center gap-3 p-3 text-left transition-colors",
-            selecionado === e.id && "border-entregue bg-entregue/8",
-          )}
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-[15px] font-bold text-crema">
-            {e.nome.slice(0, 1)}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[16px] font-semibold text-tinta">{e.nome}</span>
-            <span className="num block truncate text-[12px] text-tinta-3">{e.telefone || "sem telefone"}</span>
-          </span>
-          {selecionado === e.id && <Check size={18} className="shrink-0 text-entregue" />}
-        </button>
-      ))}
+    <div className="flex flex-col gap-3 pb-2">
+      {atuais.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {atuais.map((e) => (
+            <div
+              key={e.id}
+              className={cn(
+                "card flex items-center gap-2.5 p-2.5 transition-colors",
+                selecionado === e.id && "border-entregue bg-entregue/8",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => aoEscolher(e.id)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand text-[15px] font-bold text-crema">
+                  {e.nome.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15.5px] font-semibold text-tinta">{e.nome}</span>
+                  <span className="num block truncate text-[12px] text-tinta-3">{e.telefone || "sem telefone"}</span>
+                </span>
+                {selecionado === e.id && <Check size={18} className="shrink-0 text-entregue" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => aoRemover(e.id, e.nome)}
+                aria-label={`Remover ${e.nome}`}
+                className="grid size-8 shrink-0 place-items-center rounded-full text-tinta-3 active:bg-cancelada/12 active:text-cancelada"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {criando ? (
+        <div className="flex flex-col gap-2.5 rounded-2xl border border-line bg-crema-2/60 p-3">
+          <p className="text-[12.5px] font-bold text-brand">Novo entregador</p>
+          <Campo
+            rotulo="Nome"
+            dica="Ex.: João"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+          />
+          <Campo
+            rotulo="Telefone (opcional)"
+            dica="(31) 99999-0000"
+            inputMode="tel"
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+          />
+          <div className="flex gap-2">
+            {atuais.length > 0 && (
+              <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={() => setCriando(false)}>
+                Cancelar
+              </Botao>
+            )}
+            <Botao variante="primario" tamanho="sm" className="flex-1" onClick={cadastrar}>
+              <Check size={15} /> Cadastrar e selecionar
+            </Botao>
+          </div>
+        </div>
+      ) : (
+        <Botao variante="dourado" tamanho="md" larguraTotal onClick={() => setCriando(true)}>
+          <Plus size={16} /> Cadastrar novo entregador
+        </Botao>
+      )}
+
       {selecionado && (
         <Botao variante="fantasma" onClick={() => aoEscolher(null)}>
           Tirar entregador

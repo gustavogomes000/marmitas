@@ -166,12 +166,6 @@ insert into public.categorias (id, nome, fluxo, emoji, cor, ordem) values
   ('cat_outro_s',   'Outro',            'saida',   '🧾', 'text-saida',   10)
 on conflict (id) do nothing;
 
-insert into public.entregadores (id, nome, telefone, ativo) values
-  ('ent_carlos',  'Carlos',  '(31) 99911-2233', true),
-  ('ent_rafael',  'Rafael',  '(31) 99922-3344', true),
-  ('ent_ju',      'Juliana', '(31) 99933-4455', true)
-on conflict (id) do nothing;
-
 insert into public.perfis (id, nome, email, papel, ativo) values
   ('usr_marcia',  'Márcia',            'marcia@marmitaria.com',   'adm',        true),
   ('usr_cozinha', 'Ajuda da cozinha',  'cozinha@marmitaria.com',  'cozinha',    true),

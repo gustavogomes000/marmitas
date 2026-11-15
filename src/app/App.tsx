@@ -10,7 +10,6 @@ import { TelaCozinha } from "@/features/cozinha/TelaCozinha";
 import { TelaAgenda } from "@/features/agenda/TelaAgenda";
 import { TelaEntregas } from "@/features/entregas/TelaEntregas";
 import { TelaVendas } from "@/features/vendas/TelaVendas";
-import { TelaUsuarios } from "@/features/usuarios/TelaUsuarios";
 import { TelaAjustes } from "@/features/ajustes/TelaAjustes";
 import { TelaTV } from "@/features/tv/TelaTV";
 
@@ -38,7 +37,6 @@ export function App() {
               <Route path="/agenda" element={<TelaAgenda />} />
               <Route path="/entregas" element={<TelaEntregas />} />
               <Route path="/vendas" element={<TelaVendas />} />
-              <Route path="/usuarios" element={<TelaUsuarios />} />
               <Route path="/ajustes" element={<TelaAjustes />} />
               <Route path="*" element={<Navigate to="/dia" replace />} />
             </Routes>
