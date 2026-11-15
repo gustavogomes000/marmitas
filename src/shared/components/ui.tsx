@@ -22,9 +22,9 @@ const VARIANTES: Record<VarianteBotao, string> = {
 };
 
 const TAMANHOS: Record<TamanhoBotao, string> = {
-  sm: "h-9 px-3 text-sm rounded-xl gap-1.5",
-  md: "h-11 px-4 text-[15px] rounded-2xl gap-2",
-  lg: "h-14 px-5 text-base rounded-[18px] gap-2.5",
+  sm: "min-h-9 px-2.5 py-1.5 text-[12.5px] sm:text-[13px] rounded-xl gap-1.5",
+  md: "min-h-11 px-3 py-2 text-[13.5px] sm:text-[14px] rounded-2xl gap-1.5",
+  lg: "min-h-13 px-4 py-2.5 text-[14.5px] sm:text-[15px] rounded-[18px] gap-2",
 };
 
 export interface BotaoProps extends Omit<HTMLMotionProps<"button">, "children"> {
@@ -49,7 +49,7 @@ export function Botao({
   ...props
 }: BotaoProps) {
   const classes = cn(
-    "inline-flex select-none items-center justify-center font-semibold transition-colors",
+    "inline-flex min-w-0 max-w-full select-none items-center justify-center overflow-hidden text-center font-semibold leading-tight tracking-tight transition-colors [&_svg]:shrink-0",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
     "disabled:pointer-events-none disabled:opacity-45",
     TAMANHOS[tamanho],
@@ -154,7 +154,7 @@ export function Chip({ children, className }: { children: ReactNode; className?:
       animate={{ opacity: 1, scale: 1 }}
       transition={MOLINHO}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+        "inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-xs font-semibold [&_svg]:shrink-0",
         className,
       )}
     >

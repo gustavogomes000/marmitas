@@ -641,15 +641,16 @@ function EditorVenda({
       </div>
 
       <p className="pb-2 pt-4 text-[13px] font-semibold uppercase tracking-wide text-tinta-3">Status</p>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {STATUS_OPCOES.map((st) => {
           const sel = status === st;
           return (
             <button
               key={st}
+              type="button"
               onClick={() => setStatus(st)}
               className={cn(
-                "relative flex h-11 flex-1 items-center justify-center rounded-2xl text-sm font-semibold",
+                "relative flex min-h-11 min-w-0 items-center justify-center overflow-hidden rounded-2xl px-1.5 text-[12px] font-semibold sm:text-[13px]",
                 !sel && "border border-line bg-white text-tinta-2",
                 sel && "text-crema",
               )}
@@ -657,9 +658,9 @@ function EditorVenda({
               {sel && (
                 <motion.span layoutId="status-edicao" transition={MOLINHO} className="absolute inset-0 rounded-2xl bg-brand" />
               )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <span className={cn("size-2 rounded-full", APARENCIA[st].ponto)} />
-                {APARENCIA[st].curto}
+              <span className="relative z-10 flex min-w-0 items-center gap-1">
+                <span className={cn("size-2 shrink-0 rounded-full", APARENCIA[st].ponto)} />
+                <span className="truncate">{APARENCIA[st].curto}</span>
               </span>
             </button>
           );
@@ -668,15 +669,16 @@ function EditorVenda({
 
       <p className="pb-2 pt-4 text-[13px] font-semibold uppercase tracking-wide text-tinta-3">Pagamento</p>
       <button
+        type="button"
         onClick={() => {
           vibrar();
           setPg((p) => !p);
         }}
-        className="flex h-14 w-full items-center justify-between rounded-2xl border border-line bg-white px-4"
+        className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-2.5"
       >
-        <span className="flex items-center gap-3 text-left">
-          <span className="font-semibold text-tinta">Pago na entrega (PG)</span>
-          <span className="text-xs text-tinta-3">Retirar depois</span>
+        <span className="flex min-w-0 flex-col text-left">
+          <span className="truncate text-[14px] font-semibold text-tinta">Pago na entrega (PG)</span>
+          <span className="truncate text-xs text-tinta-3">Retirar depois</span>
         </span>
         <span
           className={cn(

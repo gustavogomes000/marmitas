@@ -444,14 +444,14 @@ export function TelaDia() {
           className="flex-1"
         />
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <Botao variante="primario" tamanho="md" className="h-11 whitespace-nowrap px-3 text-[13.5px]" onClick={() => setColagemAberta(true)}>
-            <ClipboardPaste size={16} />
-            Colar grupo
+        <div className="grid grid-cols-2 gap-2">
+          <Botao variante="primario" tamanho="md" className="min-h-11 px-2.5 text-[13px] sm:text-[13.5px]" onClick={() => setColagemAberta(true)}>
+            <ClipboardPaste size={15} />
+            <span className="truncate">Colar grupo</span>
           </Botao>
-          <Botao variante="neutro" tamanho="md" className="h-11 whitespace-nowrap px-3 text-[13.5px]" onClick={() => setAvulsoAberto(true)}>
-            <UserPlus size={16} />
-            Pedido avulso
+          <Botao variante="neutro" tamanho="md" className="min-h-11 px-2.5 text-[13px] sm:text-[13.5px]" onClick={() => setAvulsoAberto(true)}>
+            <UserPlus size={15} />
+            <span className="truncate">Pedido avulso</span>
           </Botao>
         </div>
 
@@ -1032,23 +1032,21 @@ function BotaoStatus({
 }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.94 }}
+      type="button"
+      whileTap={{ scale: 0.95 }}
       transition={MOLINHO}
       onClick={onClick}
       aria-pressed={ativo}
       className={cn(
-        "flex h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl border-2 px-1.5 text-[11.5px] font-bold transition-colors sm:text-[12.5px]",
+        "flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden rounded-xl border-2 px-1.5 py-1.5 text-[11px] font-bold tracking-tight transition-colors min-[380px]:text-[12px] sm:text-[12.5px]",
         ativo ? cor.solido : cor.inativo,
       )}
     >
-      <span
-        className={cn(
-          "grid size-3.5 shrink-0 place-items-center rounded-full border-[1.75px] border-current transition-opacity",
-          ativo ? "opacity-100" : "opacity-45",
-        )}
-      >
-        {ativo && <Check size={9.5} strokeWidth={3.5} />}
-      </span>
+      {ativo ? (
+        <Check size={11} strokeWidth={3.2} className="shrink-0" />
+      ) : (
+        <span className="size-1.5 shrink-0 rounded-full bg-current opacity-45" />
+      )}
       <span className="truncate leading-none">{rotulo}</span>
     </motion.button>
   );
@@ -1214,7 +1212,7 @@ function LinhaPedido({
         </div>
       )}
 
-      <div className="relative mt-1.5 flex items-stretch gap-1.5">
+      <div className="relative mt-1.5 grid grid-cols-3 gap-1.5">
         <BotaoStatus rotulo="Preparada" ativo={etapaPreparada} cor={PREPARADA} onClick={aoPreparar} />
         <BotaoStatus rotulo="Entregue" ativo={etapaEntregue} cor={ENTREGUE} onClick={aoEntregar} />
         <BotaoStatus rotulo="Paga" ativo={etapaPaga} cor={PAGA} onClick={aoPagar} />
@@ -1351,6 +1349,7 @@ function FormPagamento({
                 <Botao
                   variante="neutro"
                   tamanho="md"
+                  className="px-2 text-[12.5px] sm:text-[13.5px]"
                   onClick={() => setConfirmandoDesmarcar(false)}
                 >
                   Manter pago
@@ -1358,9 +1357,10 @@ function FormPagamento({
                 <Botao
                   variante="perigo"
                   tamanho="md"
+                  className="px-2 text-[12.5px] sm:text-[13.5px]"
                   onClick={aoDesmarcar}
                 >
-                  Sim, desmarcar
+                  Desmarcar
                 </Botao>
               </div>
             </motion.div>
@@ -1380,14 +1380,29 @@ function FormPagamento({
           </div>
 
           {sugestao > 0 && (
-            <div className="grid grid-cols-3 gap-2">
-              <Botao variante="neutro" tamanho="sm" onClick={() => setValor(sugestao.toFixed(2).replace(".", ","))}>
-                {moeda(sugestao)} exato
+            <div className="grid grid-cols-3 gap-1.5">
+              <Botao
+                variante="neutro"
+                tamanho="sm"
+                className="px-1.5 text-[11.5px] sm:text-[12.5px]"
+                onClick={() => setValor(sugestao.toFixed(2).replace(".", ","))}
+              >
+                Valor exato
               </Botao>
-              <Botao variante="neutro" tamanho="sm" onClick={() => setValor((sugestao + 5).toFixed(2).replace(".", ","))}>
-                + frete {moeda(5)}
+              <Botao
+                variante="neutro"
+                tamanho="sm"
+                className="px-1.5 text-[11.5px] sm:text-[12.5px]"
+                onClick={() => setValor((sugestao + 5).toFixed(2).replace(".", ","))}
+              >
+                + R$ 5 frete
               </Botao>
-              <Botao variante="neutro" tamanho="sm" onClick={() => setValor((sugestao / 2).toFixed(2).replace(".", ","))}>
+              <Botao
+                variante="neutro"
+                tamanho="sm"
+                className="px-1.5 text-[11.5px] sm:text-[12.5px]"
+                onClick={() => setValor((sugestao / 2).toFixed(2).replace(".", ","))}
+              >
                 Metade
               </Botao>
             </div>
@@ -1401,7 +1416,7 @@ function FormPagamento({
 
           <div className="flex flex-col gap-1.5">
             <span className="pl-1 text-[12.5px] font-semibold text-tinta-2">Forma de pagamento</span>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-4">
               {FORMAS.map((f) => (
                 <button
                   key={f.valor}
@@ -1411,7 +1426,7 @@ function FormPagamento({
                     setForma(f.valor);
                   }}
                   className={cn(
-                    "rounded-2xl border-2 py-2.5 text-center text-[13px] font-bold transition-all active:scale-96",
+                    "min-w-0 truncate rounded-2xl border-2 px-1.5 py-2.5 text-center text-[12px] font-bold transition-all active:scale-96 sm:text-[13px]",
                     forma === f.valor
                       ? "border-paga bg-paga text-white shadow-suave"
                       : "border-line bg-white text-tinta-2",
@@ -1550,12 +1565,12 @@ function EscolhaEntregador({
           />
           <div className="flex gap-2">
             {atuais.length > 0 && (
-              <Botao variante="neutro" tamanho="sm" className="flex-1" onClick={() => setCriando(false)}>
+              <Botao variante="neutro" tamanho="sm" className="flex-1 px-2" onClick={() => setCriando(false)}>
                 Cancelar
               </Botao>
             )}
-            <Botao variante="primario" tamanho="sm" className="flex-1" onClick={cadastrar}>
-              <Check size={15} /> Cadastrar e selecionar
+            <Botao variante="primario" tamanho="sm" className="flex-1 px-2" onClick={cadastrar}>
+              <Check size={15} /> Cadastrar
             </Botao>
           </div>
         </div>
@@ -1616,15 +1631,16 @@ function PainelDivisao({
         </span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {(["pendente", "preparada", "entregue"] as const).map((s) => {
           const cor = s === "pendente" ? APARENCIA.pendente : s === "preparada" ? PREPARADA : ENTREGUE;
           return (
             <button
               key={s}
+              type="button"
               onClick={() => setStatus(s)}
               className={cn(
-                "h-11 flex-1 rounded-xl border-2 text-[12px] font-bold transition-colors",
+                "min-h-11 min-w-0 truncate rounded-xl border-2 px-1.5 text-[11.5px] font-bold transition-colors sm:text-[12.5px]",
                 status === s ? cor.ativo : cor.inativo,
               )}
             >
@@ -1756,15 +1772,16 @@ function DetalhePedido({
         </span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {(["pendente", "preparada", "entregue"] as const).map((s) => {
           const cor = s === "pendente" ? APARENCIA.pendente : s === "preparada" ? PREPARADA : ENTREGUE;
           return (
             <button
               key={s}
+              type="button"
               onClick={() => aoStatus(s)}
               className={cn(
-                "h-11 flex-1 rounded-xl border-2 text-[12px] font-bold capitalize transition-colors",
+                "min-h-11 min-w-0 truncate rounded-xl border-2 px-1.5 text-[11.5px] font-bold capitalize transition-colors sm:text-[12.5px]",
                 venda.status === s ? cor.ativo : cor.inativo,
               )}
             >
@@ -1904,7 +1921,7 @@ function DetalhePedido({
       {venda.qtd > 1 && !cancelada && (
         <Botao variante="neutro" tamanho="md" larguraTotal onClick={aoDividir}>
           <Scissors size={16} />
-          Marcar só algumas ({venda.qtd} marmitas nesta linha)
+          Separar marmitas ({venda.qtd} no pedido)
         </Botao>
       )}
 

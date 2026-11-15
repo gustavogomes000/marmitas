@@ -497,7 +497,7 @@ export function TelaCaixa() {
               tamanho="sm"
               onClick={() => setPeriodo(p.id)}
               className={cn(
-                "relative min-h-11 flex-1 rounded-full text-[13px] font-semibold",
+                "relative min-h-10 flex-1 rounded-full px-1.5 text-[12px] font-semibold sm:text-[13px]",
                 ativo ? "text-crema" : "text-tinta-2",
               )}
             >
@@ -508,7 +508,7 @@ export function TelaCaixa() {
                   className="absolute inset-0 rounded-full bg-brand"
                 />
               )}
-              <span className="relative">{p.rotulo}</span>
+              <span className="relative truncate">{p.rotulo}</span>
             </Botao>
           );
         })}
@@ -754,7 +754,7 @@ function PainelCobrancasCaixa({
         <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-tinta-3">
           Forma do recebimento
         </span>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-4">
           {FORMAS.map((f) => {
             const ativo = formaPadrao === f.id;
             return (
@@ -766,7 +766,7 @@ function PainelCobrancasCaixa({
                   setFormaPadrao(f.id);
                 }}
                 className={cn(
-                  "rounded-xl border py-2 text-[12px] font-bold transition-colors",
+                  "min-w-0 truncate rounded-xl border px-1.5 py-2 text-[12px] font-bold transition-colors",
                   ativo ? "border-paga bg-paga text-white" : "border-line bg-white text-tinta-2",
                 )}
               >
@@ -1459,7 +1459,7 @@ function PainelMovimentacao({
             </Botao>
             <Botao variante="perigo" tamanho="md" onClick={apagar} carregando={removerMov.isPending}>
               <Trash2 size={17} />
-              Confirmar apagar
+              Apagar
             </Botao>
           </div>
         </motion.div>

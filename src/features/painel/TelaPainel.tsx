@@ -208,7 +208,7 @@ export function TelaPainel() {
                 tamanho="sm"
                 onClick={() => setPeriodo(p.id)}
                 className={cn(
-                  "relative min-h-11 flex-1 rounded-full text-[13px] font-semibold",
+                  "relative min-h-10 flex-1 rounded-full px-1.5 text-[12px] font-semibold sm:text-[13px]",
                   ativo ? "text-crema" : "text-tinta-2",
                 )}
               >
@@ -219,7 +219,7 @@ export function TelaPainel() {
                     className="absolute inset-0 rounded-full bg-brand"
                   />
                 )}
-                <span className="relative">{p.rotulo}</span>
+                <span className="relative truncate">{p.rotulo}</span>
               </Botao>
             );
           })}
@@ -995,7 +995,7 @@ function PainelRecebimento({
             className="flex-1"
             onClick={() => setValorTexto(devido.toFixed(2).replace(".", ","))}
           >
-            {moeda(devido)} exato
+            Valor exato
           </Botao>
           <Botao
             variante="neutro"
@@ -1003,7 +1003,7 @@ function PainelRecebimento({
             className="flex-1"
             onClick={() => setValorTexto((devido + 5).toFixed(2).replace(".", ","))}
           >
-            + frete {moeda(5)}
+            + R$ 5 frete
           </Botao>
         </div>
       </div>

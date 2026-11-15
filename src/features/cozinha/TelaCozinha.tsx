@@ -445,17 +445,17 @@ function PainelLinha({ venda, hoje, aoFechar }: { venda: Venda; hoje: string; ao
 
       <div>
         <TituloSecao>Status</TituloSecao>
-        <div className="mt-2 grid grid-cols-3 gap-2">
+        <div className="mt-2 grid grid-cols-2 gap-2">
           {ORDEM_STATUS.map((st) => {
             const atual = rascunho.status === st;
             return (
               <Botao
                 key={st}
                 variante="neutro"
-                tamanho="lg"
+                tamanho="md"
                 onClick={() => setRascunho((r) => ({ ...r, status: st }))}
                 className={cn(
-                  "flex-col gap-1 px-1 text-[13px]",
+                  "gap-1.5 px-2.5 text-[12.5px] sm:text-[13.5px]",
                   atual
                     ? cn(
                         APARENCIA[st].barra,
@@ -465,8 +465,8 @@ function PainelLinha({ venda, hoje, aoFechar }: { venda: Venda; hoje: string; ao
                     : "text-tinta-2",
                 )}
               >
-                {atual && <Check size={16} />}
-                {APARENCIA[st].rotulo}
+                {atual && <Check size={15} />}
+                <span className="truncate">{APARENCIA[st].rotulo}</span>
               </Botao>
             );
           })}
